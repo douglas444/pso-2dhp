@@ -1,0 +1,8 @@
+*.cbp
+*.layout
+*.depend
+*~
+bin/
+obj/
+plot_file
+*.xml
