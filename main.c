@@ -4,5 +4,6 @@
 
 int main()
 {
-  usage_tests();
+    srand((unsigned)time(NULL));
+    usage_tests();
 }

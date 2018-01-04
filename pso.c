@@ -1,64 +1,296 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <math.h>
 #include "pso.h"
+
 
 
 #define MAX(a,b) (((a) > (b)) ? (a) : (b))
 
-typedef enum
-{
-    L, R, F, B, NONE
-} Position;
 
-typedef struct pso_config
-{
-    int num_particulas;
-    int iterations;
-    double c1;
-    double c2;
-    double w;
-} Pso_config;
 
-typedef struct coord
+enum boolean
+{
+    FALSE = 0,
+    TRUE = 1
+};
+
+enum direction
+{
+    LEFT = 0,
+    RIGHT = 1,
+    STRAIGHT = 2,
+    NONE = 3
+};
+
+enum polarity
+{
+    P = 0,
+    H = 1
+};
+
+struct position
+{
+    enum direction *dir;
+    struct coord *coord;
+    int *fitness_by_edge;
+    int fitness;
+    enum boolean feasible;
+};
+
+struct coord
 {
     int x;
     int y;
-} Coord;
+};
 
-typedef struct velocity
+struct candidate
 {
-    double p_L;
-    double p_R;
-    double p_F;
-    double p_B;
-} Velocity;
+    int heuristic;
+    struct coord coord;
+    struct coord move;
+};
 
-typedef struct particle
+struct velocity
 {
-    Velocity *velocity;
-    Position *position;
-    Position *pbest;
-    int fitness;
-    int fitness_pbest;
-} Particle;
+    double l;
+    double r;
+    double s;
+};
+
+struct particle
+{
+    struct velocity *velocity;
+    struct position position;
+    struct position pbest;
+};
 
 
 
-void fitness
-(
-    Particle *particle,
-    int **lattice
-)
-/* ====================================
- *
- * ====================================
+typedef enum boolean Boolean;
+typedef enum direction Direction;
+typedef enum polarity Polarity;
+typedef struct position Position;
+typedef struct coord Coord;
+typedef struct candidate Candidate;
+typedef struct pso_config Pso_config;
+typedef struct velocity Velocity;
+typedef struct particle Particle;
+
+
+
+Coord create_new_coord(int x, int y)
+/* ===========================================================
+ * Returns a new variables of type Coord with the given values
+ * ===========================================================
  */
 {
+    Coord coord;
+    coord.x = x;
+    coord.y = y;
+    return coord;
 }
 
 
 
-void initializes_empty_velocity
+Coord subtract_coord
+(
+    Coord c1,
+    Coord c2
+)
+/* =======================================================
+ * Calculates the difference between two given coordinates
+ * =======================================================
+ */
+{
+    Coord c3;
+
+    c3.x = c1.x - c2.x;
+    c3.y = c1.y - c2.y;
+
+    return c3;
+}
+
+
+
+Coord straight(Coord prev_move)
+/* =================================================================
+ * Calculates straight move corresponding to the given previous move
+ * =================================================================
+ */
+{
+    Coord move;
+
+    if (prev_move.x == 1)
+    {
+        move.x = 1;
+        move.y = 0;
+    }
+    else if (prev_move.x == -1)
+    {
+        move.x = -1;
+        move.y = 0;
+    }
+    else if (prev_move.y == -1)
+    {
+        move.x = 0;
+        move.y = -1;
+    }
+    else if (prev_move.y == 1)
+    {
+        move.x = 0;
+        move.y = 1;
+    }
+    else
+    {
+        printf("Error in function aco.c/straight: Invalid value for parameter prev_move\n");
+        exit(1);
+    }
+
+    return move;
+}
+
+
+
+Coord left(Coord prev_move)
+/* =============================================================
+ * Calculates left move corresponding to the given previous move
+ * =============================================================
+ */
+{
+    Coord move;
+
+    if (prev_move.x == 1)
+    {
+        move.x = 0;
+        move.y = 1;
+    }
+    else if (prev_move.x == -1)
+    {
+        move.x = 0;
+        move.y = -1;
+    }
+    else if (prev_move.y == -1)
+    {
+        move.x = 1;
+        move.y = 0;
+    }
+    else if (prev_move.y == 1)
+    {
+        move.x = -1;
+        move.y = 0;
+    }
+    else
+    {
+        printf("Error in function aco.c/left: Invalid value for parameter prev_move\n");
+        exit(1);
+    }
+
+    return move;
+}
+
+
+
+Coord right(Coord prev_move)
+/* ==============================================================
+ * Calculates right move corresponding to the given previous move
+ * ==============================================================
+ */
+{
+    Coord move;
+
+    if (prev_move.x == 1)
+    {
+        move.x = 0;
+        move.y = -1;
+    }
+    else if (prev_move.x == -1)
+    {
+        move.x = 0;
+        move.y = 1;
+    }
+    else if (prev_move.y == -1)
+    {
+        move.x = -1;
+        move.y = 0;
+    }
+    else if (prev_move.y == 1)
+    {
+        move.x = 1;
+        move.y = 0;
+    }
+    else
+    {
+        printf("Error in function aco.c/right: Invalid value for parameter prev_move\n");
+        exit(1);
+    }
+
+    return move;
+}
+
+
+
+void init_position
+(
+    Position *position,
+    int num_dimensions
+)
+/* ================================================
+ * Allocates memory to Position structure variables
+ * ================================================
+ */
+{
+    position->coord = (Coord*) malloc(sizeof(Coord) * num_dimensions);
+    position->dir = (Direction*) malloc(sizeof(Direction) * (num_dimensions - 1));
+    position->fitness_by_edge = (int*) malloc(sizeof(int) * (num_dimensions - 1));
+    position->feasible = FALSE;
+}
+
+
+
+void free_position(Position position)
+/* ============================================
+ * Frees memory of Position structure variables
+ * ============================================
+ */
+{
+    free(position.coord);
+    free(position.dir);
+    free(position.fitness_by_edge);
+}
+
+
+
+void init_particle
+(
+    Particle *particle,
+    int num_dimensions
+)
+/* ================================================
+ * Allocates memory to Particle structure variables
+ * ================================================
+ */
+{
+    init_position(&(particle->position), num_dimensions);
+    init_position(&(particle->pbest), num_dimensions);
+    particle->velocity = (Velocity*) malloc(sizeof(Velocity) * (num_dimensions - 1));
+}
+
+
+
+void free_particle(Particle particle)
+/* ============================================
+ * Frees memory of Particle structure variables
+ * ============================================
+ */
+{
+    free_position(particle.position);
+    free_position(particle.pbest);
+    free(particle.velocity);
+}
+
+
+void set_default_velocity
 (
     Velocity *velocity,
     int num_dimensions
@@ -69,31 +301,11 @@ void initializes_empty_velocity
  */
 {
     int i;
-    for (i = 0; i < num_dimensions; ++i)
+    for (i = 0; i < num_dimensions - 1; ++i)
     {
-        velocity[i].p_L = -1;
-        velocity[i].p_R = -1;
-        velocity[i].p_F = -1;
-        velocity[i].p_B = -1;
-    }
-}
-
-
-
-void initializes_empty_position
-(
-    Position *position,
-    int num_dimensions
-)
-/* =====================================================
- * Sets default values to a position passed by reference
- * =====================================================
- */
-{
-    int i;
-    for (i = 0; i < num_dimensions; ++i)
-    {
-        position[i] = NONE;
+        velocity[i].l = 0;
+        velocity[i].r = 0;
+        velocity[i].s = 0;
     }
 }
 
@@ -112,41 +324,15 @@ void multiplies_coefficient_by_velocity
 {
     int i;
 
-    for (i = 0; i < num_dimensions; ++i)
+    for (i = 0; i < num_dimensions - 1; ++i)
     {
-        if (velocity[i].p_L != -1)
-        {
-            velocity[i].p_L = velocity[i].p_L * coefficient;
-            if (velocity[i].p_L > 1)
-            {
-                velocity[i].p_L = 1;
-            }
-        }
+        velocity[i].l = velocity[i].l * coefficient;
+        velocity[i].r = velocity[i].r * coefficient;
+        velocity[i].s = velocity[i].s * coefficient;
 
-        if (velocity[i].p_R != -1)
-        {
-            velocity[i].p_R = velocity[i].p_R * coefficient;
-            if (velocity[i].p_R > 1)
-            {
-                velocity[i].p_R = 1;
-            }
-        }
-        if (velocity[i].p_B != -1)
-        {
-            velocity[i].p_B = velocity[i].p_B * coefficient;
-            if (velocity[i].p_B > 1)
-            {
-                velocity[i].p_B = 1;
-            }
-        }
-        if (velocity[i].p_F != -1)
-        {
-            velocity[i].p_F = velocity[i].p_F * coefficient;
-            if (velocity[i].p_F > 1)
-            {
-                velocity[i].p_F = 1;
-            }
-        }
+        if (velocity[i].l > 1) velocity[i].l = 1;
+        if (velocity[i].r > 1) velocity[i].r = 1;
+        if (velocity[i].s > 1) velocity[i].s = 1;
     }
 }
 
@@ -165,37 +351,36 @@ void sum_velocities
 {
     int i;
 
-    for (i = 0; i < num_dimensions; ++i)
+    for (i = 0; i < num_dimensions - 1; ++i)
     {
-        v1[i].p_L = MAX(v1[i].p_L, v2[i].p_L);
-        v1[i].p_R = MAX(v1[i].p_R, v2[i].p_R);
-        v1[i].p_B = MAX(v1[i].p_B, v2[i].p_B);
-        v1[i].p_F = MAX(v1[i].p_F, v2[i].p_F);
+        v1[i].l = MAX(v1[i].l, v2[i].l);
+        v1[i].r = MAX(v1[i].r, v2[i].r);
+        v1[i].s = MAX(v1[i].s, v2[i].s);
     }
 }
+
 
 
 void subtract_positions
 (
     Position *p1,
-    Position *p2,
+    Position p2,
     int num_dimensions
 )
 /* ============================================================
- * Set the value of position p1 to the subtraction of v1 and v2
+ * Set the value of position p1 to the subtraction of p1 and p2
  * ============================================================
  */
 {
-    int i, j;
+    int i;
 
-    for (i = 0; i < num_dimensions; ++i)
+    p1->feasible = FALSE;
+
+    for (i = 0; i < num_dimensions - 1; ++i)
     {
-        for (j = 0; j < num_dimensions; ++j)
+        if (p1->dir[i] == p2.dir[i] && p1->dir[i] != NONE)
         {
-            if (p1[i] == p2[i] && p1[i] != NONE)
-            {
-                p1[i] = NONE;
-            }
+            p1->dir[i] = NONE;
         }
     }
 }
@@ -206,7 +391,8 @@ void multiplies_coefficient_by_position
 (
     Velocity *velocity,
     double coefficient,
-    Position *position, int num_dimensions
+    Position position,
+    int num_dimensions
 )
 /* =========================================================================================
  * Sets the value of velocity to the result of the multiplication of coefficient by position
@@ -215,23 +401,24 @@ void multiplies_coefficient_by_position
 {
     int i;
 
-    for (i = 0; i < num_dimensions; ++i)
+    for (i = 0; i < num_dimensions - 1; ++i)
     {
-        switch(position[i])
+        switch(position.dir[i])
         {
-        case L:
-            velocity[i].p_L = coefficient;
+        case LEFT:
+            velocity[i].l = coefficient;
+            if (velocity[i].l > 1) velocity[i].l = 1;
             break;
-        case R:
-            velocity[i].p_R = coefficient;
+        case RIGHT:
+            velocity[i].r = coefficient;
+            if (velocity[i].r > 1) velocity[i].r = 1;
             break;
-        case F:
-            velocity[i].p_F = coefficient;
-            break;
-        case B:
-            velocity[i].p_B = coefficient;
+        case STRAIGHT:
+            velocity[i].s = coefficient;
+            if (velocity[i].s > 1) velocity[i].s = 1;
             break;
         default:
+            velocity[i].l = 0;
             break;
         }
     }
@@ -251,12 +438,11 @@ void copy_velocity
  */
 {
     int i;
-    for (i = 0; i < num_dimensions; ++i)
+    for (i = 0; i < num_dimensions - 1; ++i)
     {
-        copy[0].p_B = velocity[0].p_B;
-        copy[0].p_F = velocity[0].p_F;
-        copy[0].p_L = velocity[0].p_L;
-        copy[0].p_R = velocity[0].p_R;
+        copy[0].s = velocity[0].s;
+        copy[0].l = velocity[0].l;
+        copy[0].r = velocity[0].r;
     }
 }
 
@@ -265,7 +451,7 @@ void copy_velocity
 void copy_position
 (
     Position *copy,
-    Position *position,
+    Position position,
     int num_dimensions
 )
 /* ==============================================
@@ -274,19 +460,28 @@ void copy_position
  */
 {
     int i;
+
+    copy->feasible = position.feasible;
+    copy->fitness = position.fitness;
+
     for (i = 0; i < num_dimensions; ++i)
     {
-        copy[i] = position[i];
+        if (i < num_dimensions - 1)
+        {
+            copy->dir[i] = position.dir[i];
+            copy->fitness_by_edge[i] = position.fitness_by_edge[i];
+        }
+        copy->coord[i] = position.coord[i];
     }
 }
 
 
 
-void calculate_velocity
+void update_velocity
 (
     Pso_config pso_config,
     Particle *particle,
-    Position *gbest,
+    Position gbest,
     int num_dimensions
 )
 /* ==================================================
@@ -299,27 +494,30 @@ void calculate_velocity
 
     Velocity *cognitive_velocity;
     Velocity *social_velocity;
-    Position *cognitive_position;
-    Position *social_position;
+    Position cognitive_position;
+    Position social_position;
 
     cognitive_velocity = (Velocity*) malloc(sizeof(Velocity) * num_dimensions);
     social_velocity = (Velocity*) malloc(sizeof(Velocity) * num_dimensions);
-    cognitive_position = (Position*) malloc(sizeof(Position) * num_dimensions);
-    social_position = (Position*) malloc(sizeof(Position) * num_dimensions);
+    init_position(&cognitive_position, num_dimensions);
+    init_position(&social_position, num_dimensions);
+
+    set_default_velocity(cognitive_velocity, num_dimensions);
+    set_default_velocity(social_velocity, num_dimensions);
 
     //velocity = w * velocity
     multiplies_coefficient_by_velocity(pso_config.w, particle->velocity, num_dimensions);
 
     //cognitive_velocity = c1 * r1 * (pbest - xi)
     r1 = rand()/RAND_MAX;
-    copy_position(cognitive_position, particle->pbest, num_dimensions);
-    subtract_positions(cognitive_position, particle->position, num_dimensions);
+    copy_position(&cognitive_position, particle->pbest, num_dimensions);
+    subtract_positions(&cognitive_position, particle->position, num_dimensions);
     multiplies_coefficient_by_position(cognitive_velocity, pso_config.c1 * r1, cognitive_position, num_dimensions);
 
     //social_velocity = c2 * r2 * (gbest - xi)
     r2 = rand()/RAND_MAX;
-    copy_position(social_position, gbest, num_dimensions);
-    subtract_positions(social_position, particle->position, num_dimensions);
+    copy_position(&social_position, gbest, num_dimensions);
+    subtract_positions(&social_position, particle->position, num_dimensions);
     multiplies_coefficient_by_position(social_velocity, pso_config.c2 * r2, social_position, num_dimensions);
 
     //velocity = velocity + cognitive_velocity  + social_velocity
@@ -328,15 +526,303 @@ void calculate_velocity
 
     free(cognitive_velocity);
     free(social_velocity);
-    free(cognitive_position);
-    free(social_position);
+    free_position(cognitive_position);
+    free_position(social_position);
 }
 
 
 
-void randomize_position
+int calculate_heuristic
 (
-    Position *position,
+    int **lattice,
+    int amino_acid_index,
+    Coord pos,
+    Polarity *seq
+)
+/* =================================================================================
+ * Calculates the number of H-H contacts if a H amino-acid occupy the given position
+ * =================================================================================
+ */
+{
+    int heuristic_value = 0;
+    int right_neighbor = lattice[pos.x + 1][pos.y];
+    int left_neighbor = lattice[pos.x - 1][pos.y];
+    int down_neighbor = lattice[pos.x][pos.y - 1];
+    int up_neighbor = lattice[pos.x][pos.y + 1];
+
+    if (right_neighbor >= 0 && abs(right_neighbor - amino_acid_index) > 1
+        && seq[right_neighbor] == H)
+    {
+        ++heuristic_value;
+    }
+    if (left_neighbor >= 0 && abs(left_neighbor - amino_acid_index) > 1
+        && seq[left_neighbor] == H)
+    {
+        ++heuristic_value;
+    }
+    if (up_neighbor >= 0 && abs(up_neighbor - amino_acid_index) > 1
+        && seq[up_neighbor] == H)
+    {
+        ++heuristic_value;
+    }
+    if (down_neighbor >= 0 && abs(down_neighbor - amino_acid_index) > 1
+        && seq[down_neighbor] == H)
+    {
+        ++heuristic_value;
+    }
+
+    return heuristic_value;
+}
+
+
+
+int random_select(double *probabilities, int len)
+/* =====================================================================
+ * Randomly chooses a integer between 0 and len with given probabilities
+ * =====================================================================
+ */
+{
+    int i = 0;
+    int result = -1;
+    double cumulative_probability = 0;
+    double r = ((double)rand()/RAND_MAX);
+
+    while(result == -1)
+    {
+        cumulative_probability += probabilities[i];
+        if(r <= cumulative_probability || i == len - 1)
+        {
+            result = i;
+        }
+        ++i;
+    }
+    return result;
+}
+
+
+
+void update_position
+(
+    Particle *particle,
+    int **lattice,
+    Polarity *seq,
+    int num_dimensions,
+    Pso_config pso_config,
+    int *best_particle_by_edge,
+    int particle_index,
+    Particle *particles
+)
+/* ============================================================================
+ * Sets particles position to feasible position built using particle's velocity
+ * ============================================================================
+ */
+{
+    int i;
+    int j;
+    int num_candidates;
+    int selected_candidate;
+    double sum_probabilities;
+    double probabilities[3];
+    Coord curr_coord;
+    Coord move;
+    Coord candidate_move[3];
+    Candidate candidates[3];
+    Position copied_position;
+
+    particle->position.fitness = 0;
+    particle->position.fitness_by_edge[0] = 0;
+
+    //DEFINES FIRST EDGE
+
+    lattice[num_dimensions][num_dimensions] = 0;
+    particle->position.coord[0] = create_new_coord(num_dimensions, num_dimensions);
+
+    move = create_new_coord(0, 1);
+    curr_coord = create_new_coord(particle->position.coord[0].x + move.x,
+                                  particle->position.coord[0].y + move.y);
+    lattice[curr_coord.x][curr_coord.y] = 1;
+    particle->position.coord[1] = curr_coord;
+
+
+    //CONSTRUCTOR LOOP
+
+    //For each edge except the first
+    for (i = 1; i < num_dimensions - 1; ++i)
+    {
+        sum_probabilities = 0;
+        num_candidates = 0;
+
+        candidate_move[0] = left(move);
+        candidate_move[1] = right(move);
+        candidate_move[2] = straight(move);
+
+        //DEFINES CANDIDATES DIRECTION
+
+        //For each direction
+        for (j = 0; j < 3; ++j)
+        {
+
+            //If the next coord in this direction is not occupied, turns current direction into a candidate
+            if (lattice[curr_coord.x + candidate_move[j].x][curr_coord.y + candidate_move[j].y] == -1)
+            {
+                candidates[num_candidates].move = candidate_move[j];
+                candidates[num_candidates].coord.x = curr_coord.x + candidates[num_candidates].move.x;
+                candidates[num_candidates].coord.y = curr_coord.y + candidates[num_candidates].move.y;
+
+                if (seq[i + 1] == H)
+                {
+                    candidates[num_candidates].heuristic =
+                        calculate_heuristic(lattice, i + 1, candidates[num_candidates].coord, seq);
+                }
+                else
+                {
+                    candidates[num_candidates].heuristic = 0;
+                }
+
+                probabilities[num_candidates] = pow(exp((double) candidates[num_candidates].heuristic / 0.3), pso_config.beta);
+
+                switch(j) {
+                case LEFT:
+                    probabilities[num_candidates] *= particle->velocity[i].l;
+                    break;
+                case RIGHT:
+                    probabilities[num_candidates] *= particle->velocity[i].r;
+                    break;
+                case STRAIGHT:
+                    probabilities[num_candidates] *= particle->velocity[i].s;
+                    break;
+                default:
+                    break;
+                }
+
+                sum_probabilities += probabilities[num_candidates];
+                ++num_candidates;
+            }
+
+        }
+
+        for (j = 0; j < num_candidates; ++j)
+        {
+            probabilities[j] = probabilities[j]/sum_probabilities;
+        }
+
+        //SELECTS A CANDIDATE
+
+        if (num_candidates == 0)
+        {
+            selected_candidate = -1;
+        }
+        else if (sum_probabilities == 0)
+        {
+            selected_candidate = rand() % num_candidates;
+        }
+        else if (num_candidates > 1)
+        {
+            selected_candidate = random_select(probabilities, num_candidates);
+        }
+        else if (num_candidates == 1)
+        {
+            selected_candidate = 0;
+        }
+
+        //UPDATE CONFORMATION
+
+        if (selected_candidate != -1)
+        {
+            move = candidates[selected_candidate].move;
+            curr_coord = candidates[selected_candidate].coord;
+            particle->position.fitness_by_edge[i] = particle->position.fitness;
+            particle->position.fitness -= candidates[selected_candidate].heuristic;
+            particle->position.coord[i + 1] = curr_coord;
+            lattice[curr_coord.x][curr_coord.y] = i + 1;
+
+        }
+        else
+        {
+            //WHEN IS IMPOSSIBLE CONTINUE THE FOLD PROCESS
+
+            switch (pso_config.collision_handler)
+            {
+
+            case PARTIAL_COPY:
+
+                //If theres no another ant to copy
+                if (best_particle_by_edge[i] == -1)
+                {
+                    for (j = 0; j <= i; ++j)
+                    {
+                        lattice[particle->position.coord[j].x][particle->position.coord[j].y] = -1;
+                    }
+
+                    i = 0;
+                    particle->position.fitness = 0;
+
+                    //Reset first edge
+                    lattice[num_dimensions][num_dimensions] = 0;
+                   particle->position.coord[0] = create_new_coord(num_dimensions, num_dimensions);
+
+                    move = create_new_coord(0, 1);
+                    curr_coord = create_new_coord(particle->position.coord[0].x + move.x,
+                                                  particle->position.coord[0].y + move.y);
+                    lattice[curr_coord.x][curr_coord.y] = 1;
+                    particle->position.coord[1] = curr_coord;
+                }
+                else
+                {
+                    copied_position = particles[best_particle_by_edge[i]].position;
+
+                    for (j = 0; j <= i; ++j)
+                    {
+                        lattice[particle->position.coord[j].x][particle->position.coord[j].y] = -1;
+                    }
+
+                    //Copy best ant for index i until i th amino-acid*/
+                    for (j = 0; j <= i; ++j)
+                    {
+                        lattice[copied_position.coord[j].x][copied_position.coord[j].y] = j;
+                        particle->position.coord[j] = copied_position.coord[j];
+                        if (j != i)
+                        {
+                            particle->position.fitness_by_edge[j] = copied_position.fitness_by_edge[j];
+                        }
+                    }
+                    curr_coord = copied_position.coord[i];
+                    particle->position.fitness = copied_position.fitness_by_edge[i];
+
+                    move = create_new_coord(curr_coord.x - copied_position.coord[i - 1].x,
+                                            curr_coord.y - copied_position.coord[i - 1].y);
+                    --i;
+                }
+                break;
+
+            default:
+                break;
+            }
+        }
+    }
+
+    particle->position.feasible = TRUE;
+
+    for (i = 0; i < num_dimensions - 1; ++i)
+    {
+        if (best_particle_by_edge[i] == -1 ||
+            particles[best_particle_by_edge[i]].position.fitness_by_edge[i] > particle->position.fitness_by_edge[i])
+        {
+            best_particle_by_edge[i] = particle_index;
+        }
+    }
+
+    for (i = 0; i < num_dimensions; ++i)
+    {
+        lattice[particle->position.coord[i].x][particle->position.coord[i].y] = -1;
+    }
+}
+
+
+
+void randomize_velocity
+(
+    Velocity *velocity,
     int num_dimensions
 )
 /* ====================================
@@ -345,32 +831,12 @@ void randomize_position
  */
 {
     int i;
-    int r;
 
-    for (i = 0; i < num_dimensions; ++i)
+    for (i = 0; i < num_dimensions - 1; ++i)
     {
-        r = rand()%5;
-
-        switch(r)
-        {
-        case 0:
-            position[i] = L;
-            break;
-        case 1:
-            position[i] = R;
-            break;
-        case 2:
-            position[i] = F;
-            break;
-        case 3:
-            position[i] = B;
-            break;
-        case 4:
-            position[i] = NONE;
-            break;
-        default:
-            break;
-        }
+        velocity[i].s = rand()/RAND_MAX;
+        velocity[i].l = rand()/RAND_MAX;
+        velocity[i].r = rand()/RAND_MAX;
     }
 }
 
@@ -381,9 +847,11 @@ void initializes_population
     Pso_config pso_config,
     Particle *particles,
     Position *gbest,
-    int fitness_gbest,
     int num_dimensions,
-    int **lattice
+    int *best_particle_by_edge,
+    int **lattice,
+    Polarity *seq
+
 )
 /* ===========================================================================================
  * Sets a random position to each particles, choose the gbest and calculate initial velocities
@@ -392,29 +860,27 @@ void initializes_population
 {
     int i;
 
-    fitness_gbest = 1;
+    gbest->fitness = 1;
 
     for (i = 0; i < pso_config.num_particulas; ++i)
     {
-        //Randomizes position
-        randomize_position(particles[i].position, num_dimensions);
-        //Calculates fitness
-        fitness(&(particles[i]), lattice);
+        //Randomizes velocity
+        randomize_velocity(particles[i].velocity, num_dimensions);
+        //Initialize position using current velocity
+        update_position(&(particles[i]), lattice, seq, num_dimensions, pso_config, best_particle_by_edge, i, particles);
         //Update pbest
-        copy_position(particles[i].pbest, particles[i].position, num_dimensions);
-        particles[i].fitness_pbest = particles[i].fitness;
+        copy_position(&(particles[i].pbest), particles[i].position, num_dimensions);
         //Update gbest
-        if (particles[i].fitness < fitness_gbest)
+        if (particles[i].position.fitness < gbest->fitness)
         {
-            fitness_gbest = particles[i].fitness;
             copy_position(gbest, particles[i].pbest, num_dimensions);
         }
     }
 
     for (i = 0; i < pso_config.num_particulas; ++i)
     {
-        initializes_empty_velocity(particles[i].velocity, num_dimensions);
-        calculate_velocity(pso_config, &(particles[i]), gbest, num_dimensions);
+        set_default_velocity(particles[i].velocity, num_dimensions);
+        update_velocity(pso_config, &(particles[i]), *gbest, num_dimensions);
     }
 
 }
@@ -444,59 +910,38 @@ void usage_tests()
         }
     }
 
-    ///FUNCTION: initializes_empty_velocity
+    ///FUNCTION: set_default_velocity
     {
         //Test variables definition
         Velocity *velocity = (Velocity*) malloc(sizeof(Velocity) * 1);
         //Function call
-        initializes_empty_velocity(velocity, 1);
+        set_default_velocity(velocity, 1);
         //Result check
-        if (velocity[0].p_B != -1 ||
-                velocity[0].p_F != -1 ||
-                velocity[0].p_L != -1 ||
-                velocity[0].p_R != -1)
+        if (velocity[0].s != 0 ||
+            velocity[0].l != 0 ||
+            velocity[0].r != 0)
         {
-            printf("Test failed on function initializes_empty_velocity\n");
+            printf("Test failed on function set_default_velocity\n");
             exit(1);
         }
         //Free memory
         free(velocity);
     }
 
-    ///FUNCTION: initializes_empty_position
-    {
-        //Test variables definition
-        Position *position = (Position*) malloc(sizeof(Position) * 3);
-        //Function call
-        initializes_empty_position(position, 3);
-        //Result check
-        if (position[0] != NONE ||
-                position[1] != NONE ||
-                position[2] != NONE)
-        {
-            printf("Test failed on function initializes_empty_position\n");
-            exit(1);
-        }
-        //Free memory
-        free(position);
-    }
-
     ///FUNCTION: multiplies_coefficient_by_velocity
     {
         //Test variables definition
-        Velocity *velocity = (Velocity*) malloc(sizeof(Velocity) * 2);
-        initializes_empty_velocity(velocity, 2);
-        velocity[1].p_L = 0.2;
-        velocity[1].p_R = 0.4;
-        velocity[1].p_F = 0.6;
-        velocity[1].p_B = 0.8;
+        Velocity *velocity = (Velocity*) malloc(sizeof(Velocity) * 3);
+        set_default_velocity(velocity, 3);
+        velocity[1].l = 0.2;
+        velocity[1].r = 0.4;
+        velocity[1].s = 0.8;
         //Function call
-        multiplies_coefficient_by_velocity(2, velocity, 2);
+        multiplies_coefficient_by_velocity(2, velocity, 3);
         //Result check
-        if (velocity[1].p_L != 0.4 ||
-                velocity[1].p_R != 0.8 ||
-                velocity[1].p_B != 1.0 ||
-                velocity[1].p_F != 1.0)
+        if (velocity[1].l != 0.4 ||
+            velocity[1].r != 0.8 ||
+            velocity[1].s != 1.0)
         {
             printf("Test failed on function multiplies_coefficient_by_velocity\n");
             exit(1);
@@ -510,24 +955,21 @@ void usage_tests()
     {
         //Test variables definition
         Velocity *v1 = (Velocity*) malloc(sizeof(Velocity) * 2);
-        initializes_empty_velocity(v1, 2);
-        v1[1].p_L = 0.2;
-        v1[1].p_R = 0.4;
-        v1[1].p_F = 0.6;
-        v1[1].p_B = 0.8;
+        set_default_velocity(v1, 3);
+        v1[1].l = 0.2;
+        v1[1].r = 0.4;
+        v1[1].s = 0.8;
         Velocity *v2 = (Velocity*) malloc(sizeof(Velocity) * 2);
-        initializes_empty_velocity(v2, 2);
-        v2[1].p_L = 0.3;
-        v2[1].p_R = 0.1;
-        v2[1].p_F = 0.6;
-        v2[1].p_B = 0.9;
+        set_default_velocity(v2, 3);
+        v2[1].l = 0.3;
+        v2[1].r = 0.1;
+        v2[1].s = 0.9;
         //Function call
-        sum_velocities(v1, v2, 2);
+        sum_velocities(v1, v2, 3);
         //Result check
-        if (v1[1].p_L != 0.3 ||
-                v1[1].p_R != 0.4 ||
-                v1[1].p_F != 0.6 ||
-                v1[1].p_B != 0.9)
+        if (v1[1].l != 0.3 ||
+            v1[1].r != 0.4 ||
+            v1[1].s != 0.9)
         {
             printf("Test failed on function sum_velocities\n");
             exit(1);
@@ -540,24 +982,27 @@ void usage_tests()
     ///FUNCTION: subtract_positions
     {
         //Test variables definition
-        Position *p1 = (Position*) malloc(sizeof(Position) * 2);
-        initializes_empty_position(p1, 2);
-        p1[1] = R;
-        Position *p2 = (Position*) malloc(sizeof(Position) * 2);
-        initializes_empty_position(p2, 2);
-        p2[1] = R;
+        Position p1;
+        init_position(&p1, 3);
+        p1.dir[0] = NONE;
+        p1.dir[1] = RIGHT;
+
+        Position p2;
+        init_position(&p2, 3);
+        p2.dir[0] = NONE;
+        p2.dir[1] = RIGHT;
         //Function call
-        subtract_positions(p1, p2, 2);
+        subtract_positions(&p1, p2, 3);
         //Result check
-        if (p1[0] != NONE ||
-                p1[1] != NONE)
+        if (p1.dir[0] != NONE ||
+            p1.dir[1] != NONE)
         {
             printf("Test failed on function subtract_positions\n");
             exit(1);
         }
         //Free memory
-        free(p1);
-        free(p2);
+        free_position(p1);
+        free_position(p2);
     }
 
     ///FUNCTION: copy_velocity
@@ -566,21 +1011,19 @@ void usage_tests()
         int i;
         Velocity *copy = (Velocity*) malloc(sizeof(Velocity) * 2);
         Velocity *velocity = (Velocity*) malloc(sizeof(Velocity) * 2);
-        initializes_empty_velocity(copy, 2);
-        initializes_empty_velocity(velocity, 2);
-        velocity[1].p_L = 0.2;
-        velocity[1].p_R = 0.4;
-        velocity[1].p_F = 0.6;
-        velocity[1].p_B = 0.8;
+        set_default_velocity(copy, 2);
+        set_default_velocity(velocity, 2);
+        velocity[1].l = 0.2;
+        velocity[1].r = 0.4;
+        velocity[1].s = 0.8;
         //Function call
         copy_velocity(copy, velocity, 2);
         //Result check
         for (i = 0; i < 2; ++i)
         {
-            if (copy[0].p_B != velocity[0].p_B ||
-                    copy[0].p_F != velocity[0].p_F ||
-                    copy[0].p_L != velocity[0].p_L ||
-                    copy[0].p_R != velocity[0].p_R)
+            if (copy[0].s != velocity[0].s ||
+                copy[0].l != velocity[0].l ||
+                copy[0].r != velocity[0].r)
             {
                 printf("Test failed on function copy_velocity\n");
             }
@@ -594,28 +1037,29 @@ void usage_tests()
     {
         //Test variables definition
         int i;
-        Position *copy = (Position*) malloc(sizeof(Position) * 2);
-        Position *position = (Position*) malloc(sizeof(Position) * 2);
-        initializes_empty_position(copy, 2);
-        initializes_empty_position(position, 2);
-        position[1] = L;
+        Position copy;
+        Position position;
+        init_position(&copy, 3);
+        init_position(&position, 3);
+        position.dir[0] = NONE;
+        position.dir[1] = LEFT;
         //Function call
-        copy_position(copy, position, 2);
+        copy_position(&copy, position, 3);
         //Result check
         for (i = 0; i < 2; ++i)
         {
-            if (copy[0] != position[0] ||
-                    copy[1] != position[1])
+            if (copy.dir[0] != position.dir[0] ||
+                copy.dir[1] != position.dir[1])
             {
                 printf("Test failed on function copy_position\n");
             }
         }
         //Free memory
-        free(copy);
-        free(position);
+        free_position(copy);
+        free_position(position);
     }
 
-    ///FUNCTION: calculate_velocity
+    ///FUNCTION: update_velocity
     {
         //Test variables definition
 
@@ -624,58 +1068,139 @@ void usage_tests()
         pso_config.c1 = 2.1;
         pso_config.c2 = 2.1;
 
-        Position *pbest = (Position*) malloc(sizeof(Position) * 3);
-        initializes_empty_position(pbest, 3);
-        pbest[0] = F;
-        pbest[1] = B;
-        pbest[2] = L;
-
-        Position *position = (Position*) malloc(sizeof(Position) * 3);
-        initializes_empty_position(position, 3);
-        position[0] = B;
-        position[1] = R;
-        position[2] = F;
-
-        Velocity *velocity = (Velocity*) malloc(sizeof(Velocity) * 3);
-        initializes_empty_velocity(velocity, 3);
-        velocity[0].p_L = 0.2;
-        velocity[1].p_R = 0.4;
-        velocity[2].p_F = 0.6;
-
         Particle particle;
-        particle.fitness = -5;
-        particle.fitness_pbest = -7;
-        particle.pbest = pbest;
-        particle.position = position;
-        particle.velocity = velocity;
 
-        Position *gbest = (Position*) malloc(sizeof(Position) * 3);
-        initializes_empty_position(gbest, 3);
-        gbest[0] = R;
-        gbest[1] = B;
-        gbest[2] = L;
+        particle.velocity = (Velocity*) malloc(sizeof(Velocity) * 3);
+        set_default_velocity(particle.velocity, 4);
+        particle.velocity[0].l = 0.2;
+        particle.velocity[1].r = 0.4;
+        particle.velocity[2].s = 0.6;
+
+        init_position(&(particle.position), 4);
+        particle.position.dir[0] = LEFT;
+        particle.position.dir[1] = RIGHT;
+        particle.position.dir[2] = STRAIGHT;
+        particle.position.fitness = -7;
+
+        init_position(&(particle.pbest), 4);
+        particle.pbest.dir[0] = STRAIGHT;
+        particle.pbest.dir[1] = RIGHT;
+        particle.pbest.dir[2] = LEFT;
+        particle.pbest.fitness = -5;
+
+        Position gbest;
+        init_position(&gbest, 4);
+        gbest.dir[0] = RIGHT;
+        gbest.dir[1] = STRAIGHT;
+        gbest.dir[2] = LEFT;
 
         //Function call
-        calculate_velocity(pso_config, &particle, gbest, 3);
+        update_velocity(pso_config, &particle, gbest, 4);
 
         //Free memory
-        free(pbest);
-        free(position);
-        free(velocity);
-        free(gbest);
+        free_position(particle.pbest);
+        free_position(particle.position);
+        free_position(gbest);
+        free(particle.velocity);
     }
 
-    ///FUNCTION: randomize_position
+    ///FUNCTION: update_position
     {
         //Test variables definition
-        Position *position = (Position*) malloc(sizeof(Position) * 3);
+
+        int i, j;
+        int num_dimensions = 10;
+        Pso_config pso_config;
+        pso_config.beta = 1;
+        pso_config.collision_handler = PARTIAL_COPY;
+
+        Polarity seq[] = {H, H, P, H, P, P, H, H, P, H};
+
+        int **lattice;
+        lattice = (int**) malloc(sizeof(int*) * (2 * num_dimensions + 1));
+        for (i = 0; i < 2 * num_dimensions + 1; ++i)
+        {
+            lattice[i] = (int*) malloc(sizeof(int) * (2 * num_dimensions + 1));
+            for (j = 0; j < 2 * num_dimensions + 1; ++j)
+            {
+                lattice[i][j] = -1;
+            }
+        }
+
+        int *best_particle_by_edge = (int*) malloc(sizeof(int) * (num_dimensions - 1));
+        for (i = 0; i < num_dimensions - 1; ++i)
+        {
+            best_particle_by_edge[i] = -1;
+        }
+
+        Particle *particles;
+        particles = (Particle*) malloc(sizeof(Particle));
+        init_particle(&(particles[0]), num_dimensions);
+
+        randomize_velocity(particles[0].velocity, num_dimensions);
+
         //Function call
-        randomize_position(position, 3);
+        update_position(&(particles[0]), lattice, seq, num_dimensions, pso_config,
+                        best_particle_by_edge, 0, particles);
+
         //Free memory
-        free(position);
+        for (i = 0; i < 2 * num_dimensions + 1; ++i) {
+            free(lattice[i]);
+        }
+        free(lattice);
+        free_particle(particles[0]);
+        free(best_particle_by_edge);
+        free(particles);
     }
 
     ///FUNCTION: initializes_population
-    {}
+    {
+        int i, j;
+        int num_dimensions = 10;
+
+        Pso_config pso_config;
+
+        pso_config.w = 0.5;
+        pso_config.c1 = 2.1;
+        pso_config.c2 = 2.1;
+        pso_config.beta = 1;
+        pso_config.num_particulas = 5;
+        pso_config.collision_handler = PARTIAL_COPY;
+
+
+        Polarity seq[] = {H, H, P, H, P, P, H, H, P, H};
+
+        Particle *particles;
+        particles = (Particle*) malloc(sizeof(Particle) * pso_config.num_particulas);
+        for (i = 0; i < pso_config.num_particulas; ++i)
+        {
+            init_particle(&(particles[i]), num_dimensions);
+        }
+
+        Position gbest;
+        init_position(&gbest, num_dimensions);
+
+
+        int *best_particle_by_edge = (int*) malloc(sizeof(int) * (num_dimensions - 1));
+        for (i = 0; i < num_dimensions - 1; ++i)
+        {
+            best_particle_by_edge[i] = -1;
+        }
+
+        int **lattice;
+        lattice = (int**) malloc(sizeof(int*) * (2 * num_dimensions + 1));
+        for (i = 0; i < 2 * num_dimensions + 1; ++i)
+        {
+            lattice[i] = (int*) malloc(sizeof(int) * (2 * num_dimensions + 1));
+            for (j = 0; j < 2 * num_dimensions + 1; ++j)
+            {
+                lattice[i][j] = -1;
+            }
+        }
+
+        //Function call
+        initializes_population(pso_config, particles, &gbest, num_dimensions, best_particle_by_edge, lattice, seq);
+
+    }
 
 }
