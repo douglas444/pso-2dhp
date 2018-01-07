@@ -23,12 +23,6 @@ enum direction
     NONE = 3
 };
 
-enum polarity
-{
-    P = 0,
-    H = 1
-};
-
 struct position
 {
     enum direction *dir;
@@ -69,11 +63,9 @@ struct particle
 
 typedef enum boolean Boolean;
 typedef enum direction Direction;
-typedef enum polarity Polarity;
 typedef struct position Position;
 typedef struct coord Coord;
 typedef struct candidate Candidate;
-typedef struct pso_config Pso_config;
 typedef struct velocity Velocity;
 typedef struct particle Particle;
 
@@ -240,10 +232,17 @@ void init_position
  * ================================================
  */
 {
+    int i;
+
     position->coord = (Coord*) malloc(sizeof(Coord) * num_dimensions);
     position->dir = (Direction*) malloc(sizeof(Direction) * (num_dimensions - 1));
     position->fitness_by_edge = (int*) malloc(sizeof(int) * (num_dimensions - 1));
     position->feasible = FALSE;
+
+    for (i = 0; i < num_dimensions - 1; ++i)
+    {
+        position->dir[i] = NONE;
+    }
 }
 
 
@@ -288,6 +287,7 @@ void free_particle(Particle particle)
     free_position(particle.pbest);
     free(particle.velocity);
 }
+
 
 
 void set_default_velocity
@@ -877,6 +877,11 @@ void initializes_population
         }
     }
 
+    for (i = 0; i < num_dimensions - 1; ++i)
+    {
+        best_particle_by_edge[i] = -1;
+    }
+
     for (i = 0; i < pso_config.num_particulas; ++i)
     {
         set_default_velocity(particles[i].velocity, num_dimensions);
@@ -885,6 +890,86 @@ void initializes_population
 
 }
 
+
+
+void pso_run
+(
+    Pso_config pso_config,
+    Polarity *seq,
+    int num_dimensions
+)
+/* ====================================
+ * PSO main function
+ * ====================================
+ */
+{
+
+    int i;
+    int j;
+    int *best_particle_by_edge;
+    int **lattice;
+    Position gbest;
+    Particle *particles;
+
+    lattice = (int**) malloc(sizeof(int*) * (2 * num_dimensions + 1));
+    for (i = 0; i < 2 * num_dimensions + 1; ++i)
+    {
+        lattice[i] = (int*) malloc(sizeof(int) * (2 * num_dimensions + 1));
+        for (j = 0; j < 2 * num_dimensions + 1; ++j)
+        {
+            lattice[i][j] = -1;
+        }
+    }
+
+    particles = (Particle*) malloc(sizeof(Particle) * pso_config.num_particulas);
+    for (i = 0; i < pso_config.num_particulas; ++i)
+    {
+        init_particle(&(particles[i]), num_dimensions);
+    }
+
+    best_particle_by_edge = (int*) malloc(sizeof(int) * (num_dimensions - 1));
+    for (i = 0; i < num_dimensions - 1; ++i)
+    {
+        best_particle_by_edge[i] = -1;
+    }
+
+    init_position(&gbest, num_dimensions);
+    initializes_population(pso_config, particles, &gbest, num_dimensions, best_particle_by_edge, lattice, seq);
+
+    for (i = 0; i < pso_config.iterations; ++i)
+    {
+        for (j = 0; j < pso_config.num_particulas; ++j)
+        {
+            update_position(&(particles[j]), lattice, seq, num_dimensions, pso_config, best_particle_by_edge, j, particles);
+
+            if (particles[j].position.fitness < gbest.fitness)
+            {
+                copy_position(&gbest, particles[j].position, num_dimensions);
+            }
+
+            update_velocity(pso_config, &(particles[j]), gbest, num_dimensions);
+        }
+        for (j = 0; j < num_dimensions - 1; ++j)
+        {
+            best_particle_by_edge[j] = -1;
+        }
+    }
+
+    printf("%d\n", gbest.fitness);
+
+    for (i = 0; i < pso_config.num_particulas; ++i)
+    {
+        free_particle(particles[i]);
+    }
+    free(particles);
+    for (i = 0; i < 2 * num_dimensions + 1; ++i)
+    {
+        free(lattice[i]);
+    }
+    free(lattice);
+    free(best_particle_by_edge);
+    free_position(gbest);
+}
 
 
 void usage_tests()
@@ -915,7 +1000,7 @@ void usage_tests()
         //Test variables definition
         Velocity *velocity = (Velocity*) malloc(sizeof(Velocity) * 1);
         //Function call
-        set_default_velocity(velocity, 1);
+        set_default_velocity(velocity, 2);
         //Result check
         if (velocity[0].s != 0 ||
             velocity[0].l != 0 ||
@@ -1200,6 +1285,20 @@ void usage_tests()
 
         //Function call
         initializes_population(pso_config, particles, &gbest, num_dimensions, best_particle_by_edge, lattice, seq);
+
+        //Free memory
+        for (i = 0; i < pso_config.num_particulas; ++i)
+        {
+            free_particle(particles[i]);
+        }
+        for (i = 0; i < 2 * num_dimensions + 1; ++i)
+        {
+            free(lattice[i]);
+        }
+        free(particles);
+        free(lattice);
+        free(best_particle_by_edge);
+        free_position(gbest);
 
     }
 
