@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include <time.h>
 #include "pso.h"
 
 
@@ -8,29 +9,6 @@
 #define MAX(a,b) (((a) > (b)) ? (a) : (b))
 
 
-
-enum boolean
-{
-    FALSE = 0,
-    TRUE = 1
-};
-
-enum direction
-{
-    LEFT = 0,
-    RIGHT = 1,
-    STRAIGHT = 2,
-    NONE = 3
-};
-
-struct position
-{
-    enum direction *dir;
-    struct coord *coord;
-    int *fitness_by_edge;
-    int fitness;
-    enum boolean feasible;
-};
 
 struct coord
 {
@@ -61,13 +39,32 @@ struct particle
 
 
 
-typedef enum boolean Boolean;
-typedef enum direction Direction;
-typedef struct position Position;
 typedef struct coord Coord;
 typedef struct candidate Candidate;
 typedef struct velocity Velocity;
 typedef struct particle Particle;
+
+
+
+void init_solution(Solution *solution, int seq_len)
+/* ====================================================
+ * Allocates memory to Solution structure variables
+ * ====================================================
+ */
+{
+    solution->directions = (char*) malloc(sizeof(char) * (seq_len + 1));
+}
+
+
+
+void free_solution(Solution solution)
+/* ===========================================
+ * Free memory of Solution structure variables
+ * ===========================================
+ */
+{
+    free(solution.directions);
+}
 
 
 
@@ -101,6 +98,95 @@ Coord subtract_coord
     c3.y = c1.y - c2.y;
 
     return c3;
+}
+
+
+int abs_direction_by_move(Coord move)
+/* =====================================
+ * Calculates absolute direction by move
+ * =====================================
+ */
+{
+    if (move.x == 0)
+    {
+        if (move.y == 1 || move.y == -1)
+        {
+            return STRAIGHT;
+        }
+        else
+        {
+            printf("Error in function aco.c/abs_direction_by_move: Invalid value for parameter move\n");
+            exit(1);
+        }
+    }
+    else if (move.y == 0)
+    {
+        if (move.x == 1)
+        {
+            return LEFT;
+        }
+        else if (move.x == -1)
+        {
+            return RIGHT;
+        }
+        else
+        {
+            printf("Error in function aco.c/abs_direction_by_move: Invalid value for parameter move\n");
+            exit(1);
+        }
+    }
+    else
+    {
+        printf("Error in function aco.c/abs_direction_by_move: Invalid value for parameter move\n");
+        exit(1);
+    }
+}
+
+
+
+int direction_by_move(Coord prev_move, Coord move)
+/* ===========================================================
+ * Calculates relative direction between two consecutive moves
+ * ===========================================================
+ */
+{
+
+    if (prev_move.x == move.x && prev_move.y == move.y)
+    {
+        return STRAIGHT;
+    }
+    else if (prev_move.y == 0)
+    {
+        if (move.y == prev_move.x)
+        {
+            return LEFT;
+        }
+        else if (abs(move.y) == abs(prev_move.x))
+        {
+            return RIGHT;
+        }
+        else
+        {
+            printf("Error in function aco.c/direction_by_move: Invalid values for parameters\n");
+            exit(1);
+        }
+    }
+    else
+    {
+        if (move.x == prev_move.y)
+        {
+            return RIGHT;
+        }
+        else if (abs(move.x) == abs(prev_move.y))
+        {
+            return LEFT;
+        }
+        else
+        {
+            printf("Error in function aco.c/direction_by_move: Invalid values for parameters\n");
+            exit(1);
+        }
+    }
 }
 
 
@@ -218,6 +304,58 @@ Coord right(Coord prev_move)
     }
 
     return move;
+}
+
+
+
+void extract_solution
+(
+    Position position,
+    Solution *solution,
+    int seq_len
+)
+/* ===============================================
+ * Extracts conformation info from Ant to Solution
+ * ===============================================
+ */
+{
+    Coord move, prev_move;
+    int i, direction;
+
+    solution->energy = position.fitness;
+
+    for (i = 0; i < seq_len - 1; ++i)
+    {
+        move = subtract_coord(position.coord[i + 1], position.coord[i]);
+
+        if (i == 0)
+        {
+            direction = abs_direction_by_move(move);
+        }
+        else
+        {
+            direction = direction_by_move(prev_move, move);
+        }
+
+        switch(direction)
+        {
+        case LEFT:
+            solution->directions[i] = 'L';
+            break;
+        case RIGHT:
+            solution->directions[i] = 'R';
+            break;
+        case STRAIGHT:
+            solution->directions[i] = 'S';
+            break;
+        default:
+            break;
+        }
+
+        prev_move = move;
+    }
+
+    solution->directions[seq_len - 1] = '\0';
 }
 
 
@@ -862,7 +1000,7 @@ void initializes_population
 
     gbest->fitness = 1;
 
-    for (i = 0; i < pso_config.num_particulas; ++i)
+    for (i = 0; i < pso_config.population; ++i)
     {
         //Randomizes velocity
         randomize_velocity(particles[i].velocity, num_dimensions);
@@ -882,7 +1020,7 @@ void initializes_population
         best_particle_by_edge[i] = -1;
     }
 
-    for (i = 0; i < pso_config.num_particulas; ++i)
+    for (i = 0; i < pso_config.population; ++i)
     {
         set_default_velocity(particles[i].velocity, num_dimensions);
         update_velocity(pso_config, &(particles[i]), *gbest, num_dimensions);
@@ -892,11 +1030,12 @@ void initializes_population
 
 
 
-void pso_run
+Position pso_run
 (
     Pso_config pso_config,
     Polarity *seq,
-    int num_dimensions
+    int num_dimensions,
+    int *seed
 )
 /* ====================================
  * PSO main function
@@ -911,6 +1050,13 @@ void pso_run
     Position gbest;
     Particle *particles;
 
+    //Sets seed
+    if (*seed == -1)
+    {
+        *seed = (unsigned) time(NULL);
+    }
+    srand(*seed);
+
     lattice = (int**) malloc(sizeof(int*) * (2 * num_dimensions + 1));
     for (i = 0; i < 2 * num_dimensions + 1; ++i)
     {
@@ -921,8 +1067,8 @@ void pso_run
         }
     }
 
-    particles = (Particle*) malloc(sizeof(Particle) * pso_config.num_particulas);
-    for (i = 0; i < pso_config.num_particulas; ++i)
+    particles = (Particle*) malloc(sizeof(Particle) * pso_config.population);
+    for (i = 0; i < pso_config.population; ++i)
     {
         init_particle(&(particles[i]), num_dimensions);
     }
@@ -938,7 +1084,7 @@ void pso_run
 
     for (i = 0; i < pso_config.iterations; ++i)
     {
-        for (j = 0; j < pso_config.num_particulas; ++j)
+        for (j = 0; j < pso_config.population; ++j)
         {
             update_position(&(particles[j]), lattice, seq, num_dimensions, pso_config, best_particle_by_edge, j, particles);
 
@@ -955,9 +1101,7 @@ void pso_run
         }
     }
 
-    printf("%d\n", gbest.fitness);
-
-    for (i = 0; i < pso_config.num_particulas; ++i)
+    for (i = 0; i < pso_config.population; ++i)
     {
         free_particle(particles[i]);
     }
@@ -968,7 +1112,8 @@ void pso_run
     }
     free(lattice);
     free(best_particle_by_edge);
-    free_position(gbest);
+
+    return gbest;
 }
 
 
@@ -1249,15 +1394,15 @@ void usage_tests()
         pso_config.c1 = 2.1;
         pso_config.c2 = 2.1;
         pso_config.beta = 1;
-        pso_config.num_particulas = 5;
+        pso_config.population = 5;
         pso_config.collision_handler = PARTIAL_COPY;
 
 
         Polarity seq[] = {H, H, P, H, P, P, H, H, P, H};
 
         Particle *particles;
-        particles = (Particle*) malloc(sizeof(Particle) * pso_config.num_particulas);
-        for (i = 0; i < pso_config.num_particulas; ++i)
+        particles = (Particle*) malloc(sizeof(Particle) * pso_config.population);
+        for (i = 0; i < pso_config.population; ++i)
         {
             init_particle(&(particles[i]), num_dimensions);
         }
@@ -1287,7 +1432,7 @@ void usage_tests()
         initializes_population(pso_config, particles, &gbest, num_dimensions, best_particle_by_edge, lattice, seq);
 
         //Free memory
-        for (i = 0; i < pso_config.num_particulas; ++i)
+        for (i = 0; i < pso_config.population; ++i)
         {
             free_particle(particles[i]);
         }
