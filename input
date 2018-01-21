@@ -7,10 +7,10 @@
 <sequence7>PPHHHPHHHHHHHHPPPHHHHHHHHHHPHPPPHHHHHHHHHHHHPPPPHHHHHHPHHPHP</sequence7>
 <sequence8>HHHHHHHHHHHHPHPHPPHHPPHHPPHPPHHPPHHPPHPPHHPPHHPPHPHPHHHHHHHHHHHH</sequence8>
 
-<c1>2</c1>
-<c2>2</c2>
+<c1>1</c1>
+<c2>1</c2>
 <w>0.95</w>
-<beta>3</beta>
+<beta>9</beta>
 
 <small-instances-population>200</small-instances-population>
 <big-instances-population>1500</big-instances-population>

@@ -37,22 +37,42 @@ struct particle
     struct position pbest;
 };
 
+enum pm_type
+{
+    ORIGINAL = 0,
+    INVERSE = 1
+};
+
+struct pm_config
+{
+    int amino_acid_index;
+    struct coord curr;
+    struct coord prev;
+    struct coord next;
+    struct coord f;
+    struct coord c;
+    enum pm_type pm_type;
+
+};
 
 
 typedef struct coord Coord;
 typedef struct candidate Candidate;
 typedef struct velocity Velocity;
 typedef struct particle Particle;
+typedef struct pm_config Pm_config;
+typedef enum pm_type Pm_type;
 
 
 
-void init_solution(Solution *solution, int seq_len)
+
+void init_solution(Solution *solution, int num_dimensions)
 /* ====================================================
  * Allocates memory to Solution structure variables
  * ====================================================
  */
 {
-    solution->directions = (char*) malloc(sizeof(char) * (seq_len + 1));
+    solution->directions = (char*) malloc(sizeof(char) * (num_dimensions + 1));
 }
 
 
@@ -99,6 +119,23 @@ Coord subtract_coord
 
     return c3;
 }
+
+
+
+int lateral_adj(Coord c1, Coord c2)
+/* ===============================================
+ * Check if two coordinates are laterally adjacent
+ * ===============================================
+ */
+{
+    if (abs(c1.x - c2.x) + abs(c1.y - c2.y) == 1) {
+        return 1;
+    } else {
+        return 0;
+    }
+
+}
+
 
 
 int abs_direction_by_move(Coord move)
@@ -312,7 +349,7 @@ void extract_solution
 (
     Position position,
     Solution *solution,
-    int seq_len
+    int num_dimensions
 )
 /* ===============================================
  * Extracts conformation info from Ant to Solution
@@ -324,7 +361,7 @@ void extract_solution
 
     solution->energy = position.fitness;
 
-    for (i = 0; i < seq_len - 1; ++i)
+    for (i = 0; i < num_dimensions - 1; ++i)
     {
         move = subtract_coord(position.coord[i + 1], position.coord[i]);
 
@@ -355,7 +392,7 @@ void extract_solution
         prev_move = move;
     }
 
-    solution->directions[seq_len - 1] = '\0';
+    solution->directions[num_dimensions - 1] = '\0';
 }
 
 
@@ -670,6 +707,50 @@ void update_velocity
 
 
 
+int calculate_relative_heuristic
+(
+    int **lattice,
+    int amino_acid_index,
+    Coord pos,
+    Polarity *seq
+)
+/* =================================================================================
+ * Calculates the number of H-H contacts if a H amino-acid occupy the given position
+ * =================================================================================
+ */
+{
+    int heuristic_value = 0;
+    int right_neighbor = lattice[pos.x + 1][pos.y];
+    int left_neighbor = lattice[pos.x - 1][pos.y];
+    int down_neighbor = lattice[pos.x][pos.y - 1];
+    int up_neighbor = lattice[pos.x][pos.y + 1];
+
+    if (right_neighbor >= 0 && right_neighbor - amino_acid_index < -1
+        && seq[right_neighbor] == H)
+    {
+        ++heuristic_value;
+    }
+    if (left_neighbor >= 0 && left_neighbor - amino_acid_index < -1
+        && seq[left_neighbor] == H)
+    {
+        ++heuristic_value;
+    }
+    if (up_neighbor >= 0 && up_neighbor - amino_acid_index < -1
+        && seq[up_neighbor] == H)
+    {
+        ++heuristic_value;
+    }
+    if (down_neighbor >= 0 && down_neighbor - amino_acid_index < -1
+        && seq[down_neighbor] == H)
+    {
+        ++heuristic_value;
+    }
+
+    return heuristic_value;
+}
+
+
+
 int calculate_heuristic
 (
     int **lattice,
@@ -710,6 +791,56 @@ int calculate_heuristic
     }
 
     return heuristic_value;
+}
+
+
+
+void adjust_particle_by_coord
+(
+    Position *position,
+    Polarity *seq,
+    int **lattice,
+    int num_dimensions
+)
+/* ================================================
+ * Adjust direction and energy based on coordinates
+ * ================================================
+ */
+{
+    int i;
+    Coord move;
+    Coord prev_move;
+    Direction direction;
+    position->fitness = 0;
+
+    for (i = 0; i < num_dimensions - 1; ++i)
+    {
+        move = subtract_coord(position->coord[i + 1], position->coord[i]);
+
+        if (seq[i] == H)
+        {
+            position->fitness -= calculate_relative_heuristic(lattice, i, position->coord[i], seq);
+        }
+
+        position->fitness_by_edge[i] = position->fitness;
+
+        if (i == 0)
+        {
+            direction = abs_direction_by_move(move);
+        }
+        else
+        {
+            direction = direction_by_move(prev_move, move);
+        }
+
+        position->dir[i] = direction;
+        prev_move = move;
+    }
+
+    if (seq[i] == H)
+    {
+        position->fitness -= calculate_relative_heuristic(lattice, num_dimensions - 1, position->coord[i], seq);
+    }
 }
 
 
@@ -1029,6 +1160,359 @@ void initializes_population
 }
 
 
+int move_amino_acid
+(
+    int current_energy,
+    int **lattice,
+    Polarity *seq,
+    int amino_acid_index,
+    Coord src,
+    Coord dest
+)
+/* ==========================================================================
+ * Moves a amino-acid to another position in the lattice, handling the energy
+ * ==========================================================================
+ */
+{
+
+    int temp;
+
+    if (seq[amino_acid_index] == H)
+    {
+        current_energy += calculate_heuristic(lattice, amino_acid_index, src, seq);
+        current_energy -= calculate_heuristic(lattice, amino_acid_index, dest, seq);
+    }
+
+    temp = lattice[src.x][src.y];
+    lattice[src.x][src.y] = lattice[dest.x][dest.y];
+    lattice[dest.x][dest.y] = temp;
+
+    return current_energy;
+}
+
+
+
+int apply_pm
+(
+    Position position,
+    Pm_config config,
+    Polarity *seq,
+    int **lattice,
+    int num_dimensions,
+    Coord *particle_coord
+)
+/* ========================================================
+ * Applies the pull-move configuration to the given protein
+ * ========================================================
+ */
+{
+
+    int i;
+    int last_modified;
+    int previous_index;
+    int before_previous_index;
+    Coord tempCoord;
+
+    if (config.pm_type == ORIGINAL)
+    {
+        previous_index = config.amino_acid_index - 1;
+        before_previous_index = config.amino_acid_index - 2;
+        last_modified = 0;
+    }
+    else
+    {
+        previous_index = config.amino_acid_index + 1;
+        before_previous_index = config.amino_acid_index + 2;
+        last_modified = num_dimensions - 1;
+    }
+
+    if (config.c.x == config.prev.x && config.c.y == config.prev.y)
+    {
+        position.fitness = move_amino_acid(position.fitness, lattice, seq,
+                                           config.amino_acid_index,
+                                           config.curr, config.f);
+
+        position.coord[config.amino_acid_index] = config.f;
+        config.curr =  position.coord[config.amino_acid_index];
+    }
+    else
+    {
+        position.fitness = move_amino_acid(position.fitness, lattice, seq,
+                                           previous_index, config.prev,
+                                           config.c);
+
+        position.coord[previous_index] = config.c;
+
+        position.fitness = move_amino_acid(position.fitness, lattice, seq,
+                                           config.amino_acid_index,
+                                           config.curr, config.f);
+
+        position.coord[config.amino_acid_index] = config.f;
+
+        i = before_previous_index;
+
+        while ((config.pm_type == ORIGINAL && i < num_dimensions - 1 && i >= 0 &&
+                lateral_adj(position.coord[i], position.coord[i + 1]) == 0) ||
+                (config.pm_type == INVERSE && i > 0 && i <= num_dimensions - 1 &&
+                 lateral_adj(position.coord[i], position.coord[i - 1]) == 0))
+        {
+            position.fitness = move_amino_acid(position.fitness, lattice, seq, i,
+                                               position.coord[i], config.curr);
+
+            tempCoord = position.coord[i];
+            position.coord[i] = config.curr;
+            config.curr = config.prev;
+            config.prev = tempCoord;
+
+            last_modified = i;
+
+            if (config.pm_type == ORIGINAL)
+            {
+                --i;
+            }
+            else if (config.pm_type == INVERSE)
+            {
+                ++i;
+            }
+
+        }
+
+    }
+
+    //DEVOLVES LATTICE TO ORIGINAL STATE
+
+    int start;
+    int end;
+
+    if (config.pm_type == ORIGINAL)
+    {
+        start = last_modified;
+        end = config.amino_acid_index;
+    }
+    else
+    {
+        end = last_modified;
+        start = config.amino_acid_index;
+    }
+
+    for (i = start; i <= end; ++i)
+    {
+        lattice[position.coord[i].x][position.coord[i].y] = -1;
+    }
+
+    for (i = start; i <= end; ++i)
+    {
+        lattice[particle_coord[i].x][particle_coord[i].y] = i;
+    }
+
+    return position.fitness;
+}
+
+
+
+int generate_pm_config
+(
+    Pm_config *config,
+    int **lattice,
+    Pm_type pm_type,
+    Coord curr,
+    Coord prev,
+    Coord next,
+    Coord direction
+)
+/* =====================================================================================
+ * Generates a pull-move configuration for a specific direction of a specific amino-acid
+ * =====================================================================================
+ */
+{
+    /* F exists? */
+    if (lattice[next.x + direction.x][next.y + direction.y] == -1 &&
+        next.x + direction.x != curr.x && next.y + direction.y != curr.y)
+    {
+        config->f.x = next.x + direction.x;
+        config->f.y = next.y + direction.y;
+        config->c.x = config->f.x + curr.x - next.x;
+        config->c.y = config->f.y + curr.y - next.y;
+
+        /*C is empty or is equals do previous amino-acid*/
+        if ((config->c.x == prev.x && config->c.y == prev.y) ||
+            lattice[config->c.x][config->c.y] == -1)
+        {
+                config->next = next;
+                config->curr = curr;
+                config->prev = prev;
+                config->pm_type = pm_type;
+
+                return 1;
+        }
+
+    }
+
+    /* Impossible generate the pull-move configuration */
+    return 0;
+}
+
+
+
+void generate_pm_configs
+(
+    int amino_acid_index,
+    int **lattice,
+    Coord *particle_coord,
+    Pm_config *configs,
+    int *config_index,
+    int num_dimensions
+)
+/* ============================================================
+ * Generates pull-move configurations for a specific amino-acid
+ * ============================================================
+ */
+{
+    int result;
+    Pm_config config;
+    config.amino_acid_index = amino_acid_index;
+
+    Coord right_move = create_new_coord(1, 0);
+    Coord left_move = create_new_coord(-1, 0);
+    Coord up_move = create_new_coord(0, 1);
+    Coord down_move = create_new_coord(0, -1);
+
+    Coord next = particle_coord[amino_acid_index + 1];
+    Coord prev = particle_coord[amino_acid_index - 1];
+    Coord curr = particle_coord[amino_acid_index];
+
+    result = generate_pm_config(&config, lattice, ORIGINAL, curr, prev, next, right_move);
+    if (result) configs[(*config_index)++] = config;
+    result = generate_pm_config(&config, lattice, ORIGINAL, curr, prev, next, left_move);
+    if (result) configs[(*config_index)++] = config;
+    result = generate_pm_config(&config, lattice, ORIGINAL, curr, prev, next, up_move);
+    if (result) configs[(*config_index)++] = config;
+    result = generate_pm_config(&config, lattice, ORIGINAL, curr, prev, next, down_move);
+    if (result) configs[(*config_index)++] = config;
+
+    next = particle_coord[amino_acid_index - 1];
+    prev = particle_coord[amino_acid_index + 1];
+
+    result = generate_pm_config(&config, lattice, INVERSE, curr, prev, next, right_move);
+    if (result) configs[(*config_index)++] = config;
+    result = generate_pm_config(&config, lattice, INVERSE, curr, prev, next, left_move);
+    if (result) configs[(*config_index)++] = config;
+    result = generate_pm_config(&config, lattice, INVERSE, curr, prev, next, up_move);
+    if (result) configs[(*config_index)++] = config;
+    result = generate_pm_config(&config, lattice, INVERSE, curr, prev, next, down_move);
+    if (result) configs[(*config_index)++] = config;
+
+}
+
+
+
+Boolean pm_search
+(
+    Polarity *seq,
+    int num_dimensions,
+    Particle *original_particle,
+    int **lattice,
+    Position best_position,
+    Position position,
+    Pm_config *configs
+)
+/* ============================================================
+ * Applies pull-moves on the protein while there is improvement
+ * ============================================================
+ */
+{
+    int i;
+    int j;
+    int num_configs = 0;
+    int previous_fitness;
+    Coord lattice_adjust;
+    Boolean change = FALSE;
+
+    best_position.fitness = 0;
+
+    //APPLY PULL-MOVE WHILE THERE IS IMPROVEMENT
+
+    do
+    {
+        num_configs = 0;
+        previous_fitness = original_particle->position.fitness;
+
+        for (i = 0; i < num_dimensions; ++i)
+        {
+            lattice[original_particle->position.coord[i].x][original_particle->position.coord[i].y] = i;
+        }
+
+        //GENERATE ALL POSSIBLE PULL-MOVES CONFIGURATIONS
+
+        for (i = 1; i < num_dimensions - 1; ++i)
+        {
+            generate_pm_configs(i, lattice, original_particle->position.coord,
+                                configs, &num_configs, num_dimensions);
+        }
+
+        /*Apply all possible pull-moves and save the best*/
+        for (i = 0; i < num_configs; ++i)
+        {
+            /*Copy original particle*/
+            position.fitness = original_particle->position.fitness;
+            for (j = 0; j < num_dimensions; ++j)
+            {
+                position.coord[j] = original_particle->position.coord[j];
+            }
+
+            /*Apply pull move on the copy*/
+            position.fitness = apply_pm(position, configs[i], seq, lattice,
+                                        num_dimensions, original_particle->position.coord);
+
+            if (position.fitness < best_position.fitness)
+            {
+                best_position.fitness = position.fitness;
+
+                for (j = 0; j < num_dimensions; ++j)
+                {
+                    best_position.coord[j] = position.coord[j];
+                }
+            }
+        }
+
+        //CHECKS IF NEW CONFORMATION IS BETTER THAN ORIGINAL CONFORMATION
+
+        if (best_position.fitness != 0 && best_position.fitness < original_particle->position.fitness)
+        {
+            change = TRUE;
+
+            lattice_adjust = create_new_coord(num_dimensions - best_position.coord[0].x,
+                                              num_dimensions - best_position.coord[0].y);
+
+            original_particle->position.fitness = previous_fitness;
+
+            for (i = 0; i < num_dimensions; ++i)
+            {
+                lattice[original_particle->position.coord[i].x][original_particle->position.coord[i].y] = -1;
+
+                /*Move protein to center*/
+                best_position.coord[i].x += lattice_adjust.x;
+                best_position.coord[i].y += lattice_adjust.y;
+
+                original_particle->position.fitness = best_position.fitness;
+
+                /*Update original original_particle*/
+                original_particle->position.coord[i] = best_position.coord[i];
+
+            }
+        }
+    }
+    while(best_position.fitness < previous_fitness);
+
+    for (i = 0; i < num_dimensions; ++i)
+    {
+        lattice[original_particle->position.coord[i].x][original_particle->position.coord[i].y] = -1;
+    }
+
+    return change;
+}
+
+
 
 Position pso_run
 (
@@ -1045,10 +1529,17 @@ Position pso_run
 
     int i;
     int j;
+    int k;
     int *best_particle_by_edge;
     int **lattice;
     Position gbest;
     Particle *particles;
+    Position pm_best_position;
+    Position pm_position;
+    Pm_config* pm_configs;
+    Solution solution;
+    Position iteration_position;
+    Boolean change;
 
     //Sets seed
     if (*seed == -1)
@@ -1056,6 +1547,8 @@ Position pso_run
         *seed = (unsigned) time(NULL);
     }
     srand(*seed);
+
+    pm_configs = (Pm_config*) malloc(sizeof(Pm_config) * 4 * (num_dimensions - 2));
 
     lattice = (int**) malloc(sizeof(int*) * (2 * num_dimensions + 1));
     for (i = 0; i < 2 * num_dimensions + 1; ++i)
@@ -1079,7 +1572,11 @@ Position pso_run
         best_particle_by_edge[i] = -1;
     }
 
+    init_solution(&solution, num_dimensions);
     init_position(&gbest, num_dimensions);
+    init_position(&pm_best_position, num_dimensions);
+    init_position(&pm_position, num_dimensions);
+    init_position(&iteration_position, num_dimensions);
     initializes_population(pso_config, particles, &gbest, num_dimensions, best_particle_by_edge, lattice, seq);
 
     for (i = 0; i < pso_config.iterations; ++i)
@@ -1087,17 +1584,60 @@ Position pso_run
         for (j = 0; j < pso_config.population; ++j)
         {
             update_position(&(particles[j]), lattice, seq, num_dimensions, pso_config, best_particle_by_edge, j, particles);
-
-            if (particles[j].position.fitness < gbest.fitness)
-            {
-                copy_position(&gbest, particles[j].position, num_dimensions);
-            }
-
             update_velocity(pso_config, &(particles[j]), gbest, num_dimensions);
         }
+
         for (j = 0; j < num_dimensions - 1; ++j)
         {
             best_particle_by_edge[j] = -1;
+        }
+
+        iteration_position = particles[0].position;
+
+        //Daemon search
+        for (j = 0; j < pso_config.population; ++j)
+        {
+
+            switch (pso_config.daemon)
+            {
+
+            case PULL_MOVE:
+
+                change = pm_search(seq, num_dimensions, &(particles[j]),
+                                   lattice, pm_best_position,
+                                   pm_position, pm_configs);
+                break;
+
+            default:
+                break;
+
+            }
+
+            if (change == TRUE)
+            {
+                for (k = 0; k < num_dimensions; ++k)
+                {
+                    lattice[particles[j].position.coord[k].x][particles[j].position.coord[k].y] = k;
+                }
+
+                adjust_particle_by_coord(&(particles[j].position), seq, lattice, num_dimensions);
+
+                for (k = 0; k < num_dimensions; ++k)
+                {
+                    lattice[particles[j].position.coord[k].x][particles[j].position.coord[k].y] = -1;
+                }
+
+                change = FALSE;
+            }
+
+            if (particles[j].position.fitness < iteration_position.fitness)
+            {
+                iteration_position = particles[j].position;
+            }
+        }
+        if (iteration_position.fitness < gbest.fitness)
+        {
+            copy_position(&gbest, iteration_position, num_dimensions);
         }
     }
 
@@ -1112,6 +1652,7 @@ Position pso_run
     }
     free(lattice);
     free(best_particle_by_edge);
+    free_solution(solution);
 
     return gbest;
 }
