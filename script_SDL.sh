@@ -42,7 +42,7 @@ do
 		fi
 
 		if [ ! -d ./energy_evolution/sequence_$i/ ]; then
-		  mkdir -p ./energy_evolution//sequence_$i/;
+		  mkdir -p ./energy_evolution/sequence_$i/;
 		fi
 		echo -e "$(cut -d' ' -f5 <<<$output)" > "./energy_evolution/sequence_$i/run_$j"
 
