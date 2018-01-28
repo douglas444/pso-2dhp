@@ -40,7 +40,6 @@ do
 			best_solution=$solution
 			best_energy_occurrences=1
 		fi
-
 	done
 
 	time_avg=$(echo "scale=2; $time_sum / $j" | bc)
