@@ -7,18 +7,26 @@
 
 int main(int argc, char **argv)
 {
-
     int i;
-    Polarity *sequence;
     Pso_config pso_config;
+    int num_dimensions;
+    Polarity *sequence;
+
     char *input_file;
     char *collision_handler;
     char *daemon;
-    int num_dimensions;
     char *char_sequence;
+    char *sequence_key;
+
+    int seed = -1;
+    int *best_energy_evolution;
+    Particle *particles;
+    Solution best_solution;
+    Solution *final_solutions;
     clock_t t0;
     double time;
-    char *sequence_key;
+
+    //Read file----------------------------------------------------------------
 
     if (argc < 3)
     {
@@ -26,10 +34,10 @@ int main(int argc, char **argv)
         exit(1);
     }
 
-    ///Extract file content
+    //Extract file content
     input_file = load_file_content(argv[1]);
 
-    ///Sequence key
+    //Sequence key
     sequence_key = (char*) malloc(sizeof(char) * (strlen(argv[2]) + 1));
     if (sequence_key == NULL)
     {
@@ -38,7 +46,7 @@ int main(int argc, char **argv)
     }
     strcpy(sequence_key, argv[2]);
 
-    ///Get parameters from file content
+    //Get parameters from file content
     pso_config.beta = char_to_double(get_key_value(input_file, "beta"));
     pso_config.c1 = char_to_double(get_key_value(input_file, "c1"));
     pso_config.c2 = char_to_double(get_key_value(input_file, "c2"));
@@ -57,7 +65,7 @@ int main(int argc, char **argv)
     collision_handler = get_key_value(input_file, "collision-handler");
     daemon = get_key_value(input_file, "daemon");
 
-    ///Set local search method
+    //Set local search method
     if (strcmp(daemon, "WITHOUT_DAEMON") == 0)
     {
         pso_config.daemon = WITHOUT_DAEMON;
@@ -72,7 +80,7 @@ int main(int argc, char **argv)
         exit(1);
     }
 
-    ///Set collision handler method
+    //Set collision handler method
     if (strcmp(collision_handler, "PARTIAL_COPY") == 0)
     {
         pso_config.collision_handler = PARTIAL_COPY;
@@ -83,7 +91,7 @@ int main(int argc, char **argv)
         exit(1);
     }
 
-    ///generate protein binary sequence
+    //generate protein binary sequence
     sequence = (Polarity*) malloc(num_dimensions * sizeof(Polarity));
     if (sequence == NULL)
     {
@@ -95,18 +103,28 @@ int main(int argc, char **argv)
         sequence[i] = char_sequence[i] == 'H' ? H : P;
     }
 
-    ///Run ACO
-    int seed = -1;
-    Solution best_solution;
+    //Run PSO------------------------------------------------------------------
 
     init_solution(&best_solution, num_dimensions);
+    best_energy_evolution = (int*) malloc(sizeof(int) * pso_config.iterations);
+    particles = (Particle*) malloc(sizeof(Particle) * pso_config.population);
+    final_solutions = (Solution*) malloc(sizeof(Solution) * pso_config.population);
+
+    for (i = 0; i < pso_config.population; ++i)
+    {
+        init_particle(&(particles[i]), num_dimensions);
+        init_solution(&(final_solutions[i]), num_dimensions);
+
+    }
+
     t0 = clock();
-    Position gbest = pso_run(pso_config, sequence, num_dimensions, &seed);
+    Position gbest = pso_run(pso_config, sequence, num_dimensions, &seed, particles, best_energy_evolution);
     time = (clock() - t0)/(double)CLOCKS_PER_SEC;
 
     extract_solution(gbest, &best_solution, num_dimensions);
 
-    ///Show gbest solution
+    //Output ------------------------------------------------------------------
+
     printf("%d %f %s ", best_solution.energy, time, best_solution.directions);
 
     for (i = 0; i < num_dimensions; ++i)
@@ -115,11 +133,34 @@ int main(int argc, char **argv)
     }
     printf(" ");
 
-    ///Free memory
+    for (i = 0; i < pso_config.iterations; ++i)
+    {
+        printf("%d\\n", best_energy_evolution[i]);
+    }
+    printf(" ");
+
+    for (i = 0; i < pso_config.population; ++i)
+    {
+        extract_solution(particles[i].position, &(final_solutions[i]), num_dimensions);
+        printf("[%d][%s]\\n", final_solutions[i].energy, final_solutions[i].directions);
+    }
+
+    //Free memory -------------------------------------------------------------
+
+    for (i = 0; i < pso_config.population; ++i)
+    {
+        free_particle(particles[i]);
+        free_solution(final_solutions[i]);
+    }
+    free_position(gbest);
+    free_solution(best_solution);
+    free(particles);
+    free(final_solutions);
     free(sequence_key);
     free(input_file);
     free(char_sequence);
     free(sequence);
+    free(best_energy_evolution);
 
     return 0;
 }

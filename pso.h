@@ -56,6 +56,13 @@ struct position
     enum boolean feasible;
 };
 
+struct particle
+{
+    struct velocity *velocity;
+    struct position position;
+    struct position pbest;
+};
+
 
 typedef enum direction Direction;
 typedef enum boolean Boolean;
@@ -64,6 +71,7 @@ typedef enum polarity Polarity;
 typedef struct pso_config Pso_config;
 typedef struct solution Solution;
 typedef struct position Position;
+typedef struct particle Particle;
 
 void usage_tests();
 void init_solution(Solution *solution, int num_dimensions);
@@ -71,4 +79,6 @@ void free_solution(Solution solution);
 void init_position(Position *position, int num_dimensions);
 void free_position(Position position);
 void extract_solution(Position position, Solution *solution, int seq_len);
-Position pso_run(Pso_config pso_config, Polarity *seq, int num_dimensions, int *seed);
+Position pso_run(Pso_config pso_config, Polarity *seq, int num_dimensions, int *seed, Particle *particle, int *best_energy_evolution);
+void init_particle(Particle *particle, int num_dimensions);
+void free_particle(Particle particle);
