@@ -19,10 +19,7 @@ int main(int argc, char **argv)
     char *sequence_key;
 
     int seed = -1;
-    int *best_energy_evolution;
-    Particle *particles;
-    Solution best_solution;
-    Solution *final_solutions;
+    Solution solution;
     clock_t t0;
     double time;
 
@@ -105,62 +102,27 @@ int main(int argc, char **argv)
 
     //Run PSO------------------------------------------------------------------
 
-    init_solution(&best_solution, num_dimensions);
-    best_energy_evolution = (int*) malloc(sizeof(int) * pso_config.iterations);
-    particles = (Particle*) malloc(sizeof(Particle) * pso_config.population);
-    final_solutions = (Solution*) malloc(sizeof(Solution) * pso_config.population);
-
-    for (i = 0; i < pso_config.population; ++i)
-    {
-        init_particle(&(particles[i]), num_dimensions);
-        init_solution(&(final_solutions[i]), num_dimensions);
-
-    }
-
     t0 = clock();
-    Position gbest = pso_run(pso_config, sequence, num_dimensions, &seed, particles, best_energy_evolution);
+    solution = pso_run(pso_config, sequence, num_dimensions, &seed);
     time = (clock() - t0)/(double)CLOCKS_PER_SEC;
-
-    extract_solution(gbest, &best_solution, num_dimensions);
 
     //Output ------------------------------------------------------------------
 
-    printf("%d %f %s ", best_solution.energy, time, best_solution.directions);
-
+    printf("%d %f %s ", solution.energy, time, solution.directions);
     for (i = 0; i < num_dimensions; ++i)
     {
         printf("%c", char_sequence[i]);
     }
-    printf(" ");
-
-    for (i = 0; i < pso_config.iterations; ++i)
-    {
-        printf("%d\\n", best_energy_evolution[i]);
-    }
-    printf(" ");
-
-    for (i = 0; i < pso_config.population; ++i)
-    {
-        extract_solution(particles[i].position, &(final_solutions[i]), num_dimensions);
-        printf("[%d][%s]\\n", final_solutions[i].energy, final_solutions[i].directions);
-    }
 
     //Free memory -------------------------------------------------------------
 
-    for (i = 0; i < pso_config.population; ++i)
-    {
-        free_particle(particles[i]);
-        free_solution(final_solutions[i]);
-    }
-    free_position(gbest);
-    free_solution(best_solution);
-    free(particles);
-    free(final_solutions);
+    free_solution(solution);
     free(sequence_key);
     free(input_file);
     free(char_sequence);
     free(sequence);
-    free(best_energy_evolution);
+    free(daemon);
+    free(collision_handler);
 
     return 0;
 }

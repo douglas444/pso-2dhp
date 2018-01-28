@@ -5,10 +5,44 @@
 #include "pso.h"
 
 
-
 #define MAX(a,b) (((a) > (b)) ? (a) : (b))
 
 
+enum direction
+{
+    LEFT = 0,
+    RIGHT = 1,
+    STRAIGHT = 2,
+    NONE = 3
+};
+
+enum pm_type
+{
+    ORIGINAL = 0,
+    INVERSE = 1
+};
+
+enum boolean
+{
+    FALSE = 0,
+    TRUE = 1
+};
+
+struct position
+{
+    enum direction *dir;
+    struct coord *coord;
+    int *fitness_by_edge;
+    int fitness;
+    enum boolean feasible;
+};
+
+struct particle
+{
+    struct velocity *velocity;
+    struct position position;
+    struct position pbest;
+};
 
 struct coord
 {
@@ -29,13 +63,6 @@ struct velocity
     double r;
     double s;
 };
-
-enum pm_type
-{
-    ORIGINAL = 0,
-    INVERSE = 1
-};
-
 struct pm_config
 {
     int amino_acid_index;
@@ -48,14 +75,16 @@ struct pm_config
 
 };
 
-
 typedef struct coord Coord;
 typedef struct candidate Candidate;
 typedef struct velocity Velocity;
 typedef struct particle Particle;
 typedef struct pm_config Pm_config;
+typedef struct position Position;
+typedef struct particle Particle;
+typedef enum direction Direction;
+typedef enum boolean Boolean;
 typedef enum pm_type Pm_type;
-
 
 
 
@@ -1507,14 +1536,12 @@ Boolean pm_search
 
 
 
-Position pso_run
+Solution pso_run
 (
     Pso_config pso_config,
     Polarity *seq,
     int num_dimensions,
-    int *seed,
-    Particle *particles,
-    int *best_energy_evolution
+    int *seed
 )
 /* ====================================
  * PSO main function
@@ -1531,9 +1558,10 @@ Position pso_run
     Position pm_best_position;
     Position pm_position;
     Pm_config* pm_configs;
-    Solution solution;
     Position iteration_position;
     Boolean change;
+    Particle *particles;
+    Solution solution;
 
     //Sets seed
     if (*seed == -1)
@@ -1560,16 +1588,20 @@ Position pso_run
         best_particle_by_edge[i] = -1;
     }
 
-    init_solution(&solution, num_dimensions);
+    particles = (Particle*) malloc(sizeof(Particle) * pso_config.population);
+    for (i = 0; i < pso_config.population; ++i)
+    {
+        init_particle(&(particles[i]), num_dimensions);
+    }
+
     init_position(&gbest, num_dimensions);
     init_position(&pm_best_position, num_dimensions);
     init_position(&pm_position, num_dimensions);
-    init_position(&iteration_position, num_dimensions);
+    init_solution(&solution, num_dimensions);
     initializes_population(pso_config, particles, &gbest, num_dimensions, best_particle_by_edge, lattice, seq);
 
     for (i = 0; i < pso_config.iterations; ++i)
     {
-        best_energy_evolution[i] = gbest.fitness;
         for (j = 0; j < pso_config.population; ++j)
         {
             update_position(&(particles[j]), lattice, seq, num_dimensions, pso_config, best_particle_by_edge, j, particles);
@@ -1636,13 +1668,25 @@ Position pso_run
             copy_position(&gbest, iteration_position, num_dimensions);
         }
     }
+
+    extract_solution(gbest, &solution, num_dimensions);
+
     for (i = 0; i < 2 * num_dimensions + 1; ++i)
     {
         free(lattice[i]);
     }
+        for (i = 0; i < pso_config.population; ++i)
+    {
+        free_particle(particles[i]);
+    }
+
+    free_position(pm_best_position);
+    free_position(pm_position);
+    free_position(gbest);
+    free(pm_configs);
+    free(particles);
     free(lattice);
     free(best_particle_by_edge);
-    free_solution(solution);
 
-    return gbest;
+    return solution;
 }
