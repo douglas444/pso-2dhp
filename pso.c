@@ -22,19 +22,13 @@ enum pm_type
     INVERSE = 1
 };
 
-enum boolean
-{
-    FALSE = 0,
-    TRUE = 1
-};
-
 struct position
 {
     enum direction *dir;
     struct coord *coord;
     int *fitness_by_edge;
     int fitness;
-    enum boolean feasible;
+    int feasible;
 };
 
 struct particle
@@ -63,6 +57,7 @@ struct velocity
     double r;
     double s;
 };
+
 struct pm_config
 {
     int amino_acid_index;
@@ -83,30 +78,7 @@ typedef struct pm_config Pm_config;
 typedef struct position Position;
 typedef struct particle Particle;
 typedef enum direction Direction;
-typedef enum boolean Boolean;
 typedef enum pm_type Pm_type;
-
-
-
-void init_solution(Solution *solution, int num_dimensions)
-/* ====================================================
- * Allocates memory to Solution structure variables
- * ====================================================
- */
-{
-    solution->directions = (char*) malloc(sizeof(char) * (num_dimensions + 1));
-}
-
-
-
-void free_solution(Solution solution)
-/* ===========================================
- * Free memory of Solution structure variables
- * ===========================================
- */
-{
-    free(solution.directions);
-}
 
 
 
@@ -367,10 +339,9 @@ Coord right(Coord prev_move)
 
 
 
-void extract_solution
+char* position_to_string
 (
     Position position,
-    Solution *solution,
     int num_dimensions
 )
 /* ===============================================
@@ -380,8 +351,9 @@ void extract_solution
 {
     Coord move, prev_move;
     int i, direction;
+    char *directions;
 
-    solution->energy = position.fitness;
+    directions = (char*) malloc(sizeof(char) * num_dimensions);
 
     for (i = 0; i < num_dimensions - 1; ++i)
     {
@@ -399,13 +371,13 @@ void extract_solution
         switch(direction)
         {
         case LEFT:
-            solution->directions[i] = 'L';
+            directions[i] = 'L';
             break;
         case RIGHT:
-            solution->directions[i] = 'R';
+            directions[i] = 'R';
             break;
         case STRAIGHT:
-            solution->directions[i] = 'S';
+            directions[i] = 'S';
             break;
         default:
             break;
@@ -414,7 +386,8 @@ void extract_solution
         prev_move = move;
     }
 
-    solution->directions[num_dimensions - 1] = '\0';
+    directions[num_dimensions - 1] = '\0';
+    return directions;
 }
 
 
@@ -434,7 +407,7 @@ void init_position
     position->coord = (Coord*) malloc(sizeof(Coord) * num_dimensions);
     position->dir = (Direction*) malloc(sizeof(Direction) * (num_dimensions - 1));
     position->fitness_by_edge = (int*) malloc(sizeof(int) * (num_dimensions - 1));
-    position->feasible = FALSE;
+    position->feasible = 0;
 
     for (i = 0; i < num_dimensions - 1; ++i)
     {
@@ -483,6 +456,95 @@ void free_particle(Particle particle)
     free_position(particle.position);
     free_position(particle.pbest);
     free(particle.velocity);
+}
+
+
+
+void init_variables
+(
+    Pso_config pso_config,
+    Pm_config **pm_configs,
+    int ***lattice,
+    int **best_particle_by_edge,
+    Particle **particles,
+    Position *gbest,
+    Position *pm_best_position,
+    Position *pm_position,
+    int num_dimensions
+)
+/* =======================================
+ * Allocates all pso.c exclusive variables
+ * =======================================
+ */
+{
+    int i;
+    int j;
+
+    *pm_configs = (Pm_config*) malloc(sizeof(Pm_config) * 4 * (num_dimensions - 2));
+
+    *lattice = (int**) malloc(sizeof(int*) * (2 * num_dimensions + 1));
+    for (i = 0; i < 2 * num_dimensions + 1; ++i)
+    {
+        (*lattice)[i] = (int*) malloc(sizeof(int) * (2 * num_dimensions + 1));
+        for (j = 0; j < 2 * num_dimensions + 1; ++j)
+        {
+            (*lattice)[i][j] = -1;
+        }
+    }
+
+    *best_particle_by_edge = (int*) malloc(sizeof(int) * (num_dimensions - 1));
+    for (i = 0; i < num_dimensions - 1; ++i)
+    {
+        (*best_particle_by_edge)[i] = -1;
+    }
+
+    *particles = (Particle*) malloc(sizeof(Particle) * pso_config.population);
+    for (i = 0; i < pso_config.population; ++i)
+    {
+        init_particle(&((*particles)[i]), num_dimensions);
+    }
+
+    init_position(gbest, num_dimensions);
+    init_position(pm_best_position, num_dimensions);
+    init_position(pm_position, num_dimensions);
+}
+
+
+
+void free_variables
+(
+    Pso_config pso_config,
+    int **lattice,
+    Particle *particles,
+    Position pm_best_position,
+    Position pm_position,
+    Position gbest,
+    Pm_config *pm_configs,
+    int *best_particle_by_edge,
+    int num_dimensions
+)
+/* ==========================================
+ * Frees all pso.c exclusive variables memory
+ * ==========================================
+ */
+{
+    int i;
+    for (i = 0; i < 2 * num_dimensions + 1; ++i)
+    {
+        free(lattice[i]);
+    }
+    for (i = 0; i < pso_config.population; ++i)
+    {
+        free_particle(particles[i]);
+    }
+
+    free_position(pm_best_position);
+    free_position(pm_position);
+    free_position(gbest);
+    free(pm_configs);
+    free(particles);
+    free(lattice);
+    free(best_particle_by_edge);
 }
 
 
@@ -571,7 +633,7 @@ void subtract_positions
 {
     int i;
 
-    p1->feasible = FALSE;
+    p1->feasible = 0;
 
     for (i = 0; i < num_dimensions - 1; ++i)
     {
@@ -1092,7 +1154,7 @@ void update_position
         }
     }
 
-    particle->position.feasible = TRUE;
+    particle->position.feasible = 1;
 
     for (i = 0; i < num_dimensions - 1; ++i)
     {
@@ -1360,12 +1422,12 @@ int generate_pm_config
         if ((config->c.x == prev.x && config->c.y == prev.y) ||
             lattice[config->c.x][config->c.y] == -1)
         {
-                config->next = next;
-                config->curr = curr;
-                config->prev = prev;
-                config->pm_type = pm_type;
+            config->next = next;
+            config->curr = curr;
+            config->prev = prev;
+            config->pm_type = pm_type;
 
-                return 1;
+            return 1;
         }
 
     }
@@ -1428,7 +1490,7 @@ void generate_pm_configs
 
 
 
-Boolean pm_search
+int pm_search
 (
     Polarity *seq,
     int num_dimensions,
@@ -1448,7 +1510,7 @@ Boolean pm_search
     int num_configs = 0;
     int previous_fitness;
     Coord lattice_adjust;
-    Boolean change = FALSE;
+    int change = 0;
 
     best_position.fitness = 0;
 
@@ -1501,7 +1563,7 @@ Boolean pm_search
 
         if (best_position.fitness != 0 && best_position.fitness <= original_particle->position.fitness)
         {
-            change = TRUE;
+            change = 1;
 
             lattice_adjust = create_new_coord(num_dimensions - best_position.coord[0].x,
                                               num_dimensions - best_position.coord[0].y);
@@ -1536,7 +1598,7 @@ Boolean pm_search
 
 
 
-Solution pso_run
+Pso_result pso_run
 (
     Pso_config pso_config,
     Polarity *seq,
@@ -1548,7 +1610,6 @@ Solution pso_run
  * ====================================
  */
 {
-
     int i;
     int j;
     int k;
@@ -1559,9 +1620,13 @@ Solution pso_run
     Position pm_position;
     Pm_config* pm_configs;
     Position iteration_position;
-    Boolean change;
+    int change;
     Particle *particles;
-    Solution solution;
+    Pso_result pso_result;
+    clock_t t0;
+
+    //Start time counter
+    t0 = clock();
 
     //Sets seed
     if (*seed == -1)
@@ -1570,34 +1635,9 @@ Solution pso_run
     }
     srand(*seed);
 
-    pm_configs = (Pm_config*) malloc(sizeof(Pm_config) * 4 * (num_dimensions - 2));
+    init_variables(pso_config, &pm_configs, &lattice, &best_particle_by_edge,
+                   &particles, &gbest, &pm_best_position, &pm_position, num_dimensions);
 
-    lattice = (int**) malloc(sizeof(int*) * (2 * num_dimensions + 1));
-    for (i = 0; i < 2 * num_dimensions + 1; ++i)
-    {
-        lattice[i] = (int*) malloc(sizeof(int) * (2 * num_dimensions + 1));
-        for (j = 0; j < 2 * num_dimensions + 1; ++j)
-        {
-            lattice[i][j] = -1;
-        }
-    }
-
-    best_particle_by_edge = (int*) malloc(sizeof(int) * (num_dimensions - 1));
-    for (i = 0; i < num_dimensions - 1; ++i)
-    {
-        best_particle_by_edge[i] = -1;
-    }
-
-    particles = (Particle*) malloc(sizeof(Particle) * pso_config.population);
-    for (i = 0; i < pso_config.population; ++i)
-    {
-        init_particle(&(particles[i]), num_dimensions);
-    }
-
-    init_position(&gbest, num_dimensions);
-    init_position(&pm_best_position, num_dimensions);
-    init_position(&pm_position, num_dimensions);
-    init_solution(&solution, num_dimensions);
     initializes_population(pso_config, particles, &gbest, num_dimensions, best_particle_by_edge, lattice, seq);
 
     for (i = 0; i < pso_config.iterations; ++i)
@@ -1634,7 +1674,7 @@ Solution pso_run
 
             }
 
-            if (change == TRUE)
+            if (change == 1)
             {
                 for (k = 0; k < num_dimensions; ++k)
                 {
@@ -1648,7 +1688,7 @@ Solution pso_run
                     lattice[particles[j].position.coord[k].x][particles[j].position.coord[k].y] = -1;
                 }
 
-                change = FALSE;
+                change = 0;
             }
 
 
@@ -1665,28 +1705,41 @@ Solution pso_run
 
         if (iteration_position.fitness < gbest.fitness)
         {
+            pso_result.found_on_iteration = i;
             copy_position(&gbest, iteration_position, num_dimensions);
         }
     }
 
-    extract_solution(gbest, &solution, num_dimensions);
+    //Ends time counter
+    pso_result.time = (clock() - t0)/(double)CLOCKS_PER_SEC;
 
-    for (i = 0; i < 2 * num_dimensions + 1; ++i)
-    {
-        free(lattice[i]);
+    pso_result.energy = gbest.fitness;
+    pso_result.final_particles_avg = 0;
+    pso_result.final_particles_solution_rate = 0;
+    pso_result.final_particles_stddev = 0;
+
+    for (i = 0; i < pso_config.population; ++i) {
+        pso_result.final_particles_avg += particles[i].position.fitness;
+        if (particles[i].position.fitness == gbest.fitness)
+        {
+            ++pso_result.final_particles_solution_rate;
+        }
     }
-        for (i = 0; i < pso_config.population; ++i)
-    {
-        free_particle(particles[i]);
+
+    pso_result.final_particles_solution_rate /= pso_config.population;
+    pso_result.final_particles_avg /= pso_config.population;
+
+    for (i = 0; i < pso_config.population; ++i) {
+        pso_result.final_particles_stddev += pow(pso_result.final_particles_avg - particles[i].position.fitness, 2);
     }
 
-    free_position(pm_best_position);
-    free_position(pm_position);
-    free_position(gbest);
-    free(pm_configs);
-    free(particles);
-    free(lattice);
-    free(best_particle_by_edge);
+    pso_result.final_particles_stddev /= pso_config.population;
+    pso_result.final_particles_stddev = sqrt(pso_result.final_particles_stddev);
+    pso_result.final_particles_solution_rate *= 100;
+    pso_result.directions = position_to_string(gbest, num_dimensions);
 
-    return solution;
+    free_variables(pso_config, lattice, particles, pm_best_position, pm_position, gbest,
+                   pm_configs, best_particle_by_edge, num_dimensions);
+
+    return pso_result;
 }

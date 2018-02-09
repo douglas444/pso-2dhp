@@ -19,9 +19,7 @@ int main(int argc, char **argv)
     char *sequence_key;
 
     int seed = -1;
-    Solution solution;
-    clock_t t0;
-    double time;
+    Pso_result pso_result;
 
     //Read file----------------------------------------------------------------
 
@@ -102,21 +100,23 @@ int main(int argc, char **argv)
 
     //Run PSO------------------------------------------------------------------
 
-    t0 = clock();
-    solution = pso_run(pso_config, sequence, num_dimensions, &seed);
-    time = (clock() - t0)/(double)CLOCKS_PER_SEC;
+    pso_result = pso_run(pso_config, sequence, num_dimensions, &seed);
 
     //Output ------------------------------------------------------------------
 
-    printf("%d %f %s ", solution.energy, time, solution.directions);
-    for (i = 0; i < num_dimensions; ++i)
-    {
-        printf("%c", char_sequence[i]);
-    }
+    printf("%s|", char_sequence);
+    printf("%s|", pso_result.directions);
+    printf("%d|", pso_result.energy);
+    printf("%f|", pso_result.final_particles_avg);
+    printf("%f|", pso_result.final_particles_solution_rate);
+    printf("%f|", pso_result.final_particles_stddev);
+    printf("%d|", pso_result.found_on_iteration);
+    printf("%f", pso_result.time);
+
 
     //Free memory -------------------------------------------------------------
 
-    free_solution(solution);
+    free(pso_result.directions);
     free(sequence_key);
     free(input_file);
     free(char_sequence);

@@ -6,7 +6,7 @@ enum daemon
 
 enum collision_handler
 {
-    PARTIAL_COPY = 1
+    PARTIAL_COPY = 0
 };
 
 enum polarity
@@ -27,16 +27,20 @@ struct pso_config
     enum daemon daemon;
 };
 
-struct solution
+struct pso_result
 {
-    int energy;
     char *directions;
+    int energy;
+    double time;
+    int found_on_iteration;
+    float final_particles_avg;
+    float final_particles_stddev;
+    float final_particles_solution_rate;
 };
 
 typedef enum daemon daemon;
 typedef enum polarity Polarity;
 typedef struct pso_config Pso_config;
-typedef struct solution Solution;
+typedef struct pso_result Pso_result;
 
-void free_solution(Solution solution);
-Solution pso_run(Pso_config pso_config, Polarity *seq, int num_dimensions, int *seed);
+Pso_result pso_run(Pso_config pso_config, Polarity *seq, int num_dimensions, int *seed);

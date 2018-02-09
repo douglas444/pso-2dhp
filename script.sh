@@ -3,7 +3,8 @@ runs_per_instance=20
 for i in `seq 1 8`
 do
 
-	echo "Sequence $i" 
+	echo "************************************** Sequence $i" 
+	echo ""
 
 	output=""
 	best_energy=0
@@ -12,6 +13,9 @@ do
 	solution=""
 	best_solution=""
 	sequence=""
+
+	echo "\begin{tabular}{|l|l|l|l|l|l|l|} \hline"
+	echo "EX & E & I & T(s) & AVG & STDDEV & RATE \\\ \hline"
 
 	for j in `seq 1 $runs_per_instance`
 	do
@@ -23,10 +27,17 @@ do
 			exit 1
 		fi
 
-		output=$(printf "%s %s %s %s %s %s" $output)
-		energy="$(cut -d' ' -f1 <<<$output)"
-		time="$(cut -d' ' -f2 <<<$output)"
-		solution="$(cut -d' ' -f3 <<<$output)"
+		sequence="$(cut -d'|' -f1 <<<$output)"
+		directions="$(cut -d'|' -f2 <<<$output)"
+		energy="$(cut -d'|' -f3 <<<$output)"
+		final_particles_avg="$(cut -d'|' -f4 <<<$output)"
+		final_particles_solution_rate="$(cut -d'|' -f5 <<<$output)"
+		final_particles_stddev="$(cut -d'|' -f6 <<<$output)"
+		found_on_iteration="$(cut -d'|' -f7 <<<$output)"
+		time="$(cut -d'|' -f8 <<<$output)"
+
+		echo "$j & $energy & $found_on_iteration & $time & $final_particles_avg & $final_particles_stddev & $final_particles_solution_rate\% \\\ \hline"
+
 		time_sum=$(echo "$time_sum + $time" | bc)
 
 		if [ $energy -eq $best_energy ]
@@ -37,10 +48,13 @@ do
 		if [ $energy -lt $best_energy ]
 		then
 			best_energy=$energy
-			best_solution=$solution
+			best_solution=$directions
 			best_energy_occurrences=1
 		fi
 	done
+
+	echo "\end{tabular}"
+	echo ""
 
 	time_avg=$(echo "scale=2; $time_sum / $j" | bc)
 
@@ -50,7 +64,8 @@ do
 	echo " * Solution = $best_solution"
 
 	sequence="$(cut -d' ' -f4 <<<$output)"
-
 	./2dhp-plot "$sequence" "$best_solution" ./sequence"$i"
+
+	echo ""
 
 done
