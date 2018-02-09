@@ -58,10 +58,10 @@ do
 
 	time_avg=$(echo "scale=2; $time_sum / $j" | bc)
 
-	echo " * Best energy = $best_energy"
-	echo " * Best energy occurrences = $best_energy_occurrences"
-	echo " * Time avg = $time_avg (s)"
-	echo " * Solution = $best_solution"
+	echo "best energy: $best_energy"
+	echo "best energy occurrences: $best_energy_occurrences"
+	echo "time avg: $time_avg (s)"
+	echo "solution: $best_solution"
 
 	sequence="$(cut -d' ' -f4 <<<$output)"
 	./2dhp-plot "$sequence" "$best_solution" ./sequence"$i"
