@@ -1625,8 +1625,8 @@ Pso_result pso_run
     Pso_result pso_result;
     clock_t t0;
 
-    //Start time counter
-    t0 = clock();
+    /**/pso_result.energy_evolution = (int*) malloc(sizeof(int) * pso_config.iterations);
+    /**/t0 = clock();
 
     //Sets seed
     if (*seed == -1)
@@ -1703,40 +1703,50 @@ Pso_result pso_run
             }
         }
 
+        /**/if (i == 0 || iteration_position.fitness < gbest.fitness) {
+        /**/    if (iteration_position.fitness < gbest.fitness) {
+        /**/        pso_result.energy_evolution[i] = iteration_position.fitness;
+        /**/    } else {
+        /**/        pso_result.energy_evolution[i] = gbest.fitness;
+        /**/    }
+        /**/} else {
+        /**/    pso_result.energy_evolution[i] = 1;
+        /**/}
+
         if (iteration_position.fitness < gbest.fitness)
         {
-            pso_result.found_on_iteration = i;
+            /**/pso_result.found_on_iteration = i;
             copy_position(&gbest, iteration_position, num_dimensions);
         }
     }
 
-    //Ends time counter
-    pso_result.time = (clock() - t0)/(double)CLOCKS_PER_SEC;
+    /**/pso_result.time = (clock() - t0)/(double)CLOCKS_PER_SEC;
+    /**/pso_result.energy = gbest.fitness;
+    /**/pso_result.final_population_avg = 0;
+    /**/pso_result.final_population_solution_rate = 0;
+    /**/pso_result.final_population_stddev = 0;
 
-    pso_result.energy = gbest.fitness;
-    pso_result.final_particles_avg = 0;
-    pso_result.final_particles_solution_rate = 0;
-    pso_result.final_particles_stddev = 0;
+    /**/for (i = 0; i < pso_config.population; ++i) {
+    /**/    pso_result.final_population_avg += particles[i].position.fitness;
+    /**/    if (particles[i].position.fitness == gbest.fitness)
+    /**/    {
+    /**/        ++pso_result.final_population_solution_rate;
+    /**/    }
+    /**/}
 
-    for (i = 0; i < pso_config.population; ++i) {
-        pso_result.final_particles_avg += particles[i].position.fitness;
-        if (particles[i].position.fitness == gbest.fitness)
-        {
-            ++pso_result.final_particles_solution_rate;
-        }
-    }
+    /**/pso_result.final_population_solution_rate /= pso_config.population;
+    /**/pso_result.final_population_avg /= pso_config.population;
 
-    pso_result.final_particles_solution_rate /= pso_config.population;
-    pso_result.final_particles_avg /= pso_config.population;
+    /**/for (i = 0; i < pso_config.population; ++i) {
+    /**/    pso_result.final_population_stddev +=
+    /**/        (pso_result.final_population_avg - particles[i].position.fitness) *
+    /**/        (pso_result.final_population_avg - particles[i].position.fitness);
+    /**/}
 
-    for (i = 0; i < pso_config.population; ++i) {
-        pso_result.final_particles_stddev += pow(pso_result.final_particles_avg - particles[i].position.fitness, 2);
-    }
-
-    pso_result.final_particles_stddev /= pso_config.population;
-    pso_result.final_particles_stddev = sqrt(pso_result.final_particles_stddev);
-    pso_result.final_particles_solution_rate *= 100;
-    pso_result.directions = position_to_string(gbest, num_dimensions);
+    /**/pso_result.final_population_stddev /= pso_config.population;
+    /**/pso_result.final_population_stddev = sqrt(pso_result.final_population_stddev);
+    /**/pso_result.final_population_solution_rate *= 100;
+    /**/pso_result.directions = position_to_string(gbest, num_dimensions);
 
     free_variables(pso_config, lattice, particles, pm_best_position, pm_position, gbest,
                    pm_configs, best_particle_by_edge, num_dimensions);

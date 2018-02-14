@@ -45,6 +45,7 @@
 			<Option compilerVar="CC" />
 		</Unit>
 		<Unit filename="pso.h" />
+		<Unit filename="script.sh" />
 		<Extensions>
 			<code_completion />
 			<envvars />

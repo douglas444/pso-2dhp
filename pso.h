@@ -30,12 +30,13 @@ struct pso_config
 struct pso_result
 {
     char *directions;
+    int *energy_evolution;
     int energy;
     double time;
     int found_on_iteration;
-    float final_particles_avg;
-    float final_particles_stddev;
-    float final_particles_solution_rate;
+    float final_population_avg;
+    float final_population_stddev;
+    float final_population_solution_rate;
 };
 
 typedef enum daemon daemon;

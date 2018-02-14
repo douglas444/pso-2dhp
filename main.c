@@ -104,19 +104,26 @@ int main(int argc, char **argv)
 
     //Output ------------------------------------------------------------------
 
+    printf("%d|", pso_config.iterations);
     printf("%s|", char_sequence);
     printf("%s|", pso_result.directions);
     printf("%d|", pso_result.energy);
-    printf("%f|", pso_result.final_particles_avg);
-    printf("%f|", pso_result.final_particles_solution_rate);
-    printf("%f|", pso_result.final_particles_stddev);
+    printf("%.2f|", pso_result.final_population_avg);
+    printf("%.2f|", pso_result.final_population_stddev);
+    printf("%.2f|", pso_result.final_population_solution_rate);
     printf("%d|", pso_result.found_on_iteration);
-    printf("%f", pso_result.time);
+    printf("%.2f|", pso_result.time);
 
+    for (i = 0; i < pso_config.iterations; ++i) {
+        if (pso_result.energy_evolution[i] != 1) {
+            printf("%d,%d/", i, pso_result.energy_evolution[i]);
+        }
+    }
 
     //Free memory -------------------------------------------------------------
 
     free(pso_result.directions);
+    free(pso_result.energy_evolution);
     free(sequence_key);
     free(input_file);
     free(char_sequence);

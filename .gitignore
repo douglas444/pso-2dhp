@@ -2,5 +2,6 @@
 *.depend
 *~
 bin/
+results/
 obj/
 *.xml
