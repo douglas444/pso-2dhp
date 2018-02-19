@@ -665,19 +665,27 @@ void multiplies_coefficient_by_position
         switch(position.dir[i])
         {
         case LEFT:
+            velocity[i].r = 0;
+            velocity[i].s = 0;
             velocity[i].l = coefficient;
             if (velocity[i].l > 1) velocity[i].l = 1;
             break;
         case RIGHT:
+            velocity[i].l = 0;
+            velocity[i].s = 0;
             velocity[i].r = coefficient;
             if (velocity[i].r > 1) velocity[i].r = 1;
             break;
         case STRAIGHT:
+            velocity[i].l = 0;
+            velocity[i].r = 0;
             velocity[i].s = coefficient;
             if (velocity[i].s > 1) velocity[i].s = 1;
             break;
         default:
             velocity[i].l = 0;
+            velocity[i].r = 0;
+            velocity[i].s = 0;
             break;
         }
     }
@@ -760,9 +768,6 @@ void update_velocity
     social_velocity = (Velocity*) malloc(sizeof(Velocity) * num_dimensions);
     init_position(&cognitive_position, num_dimensions);
     init_position(&social_position, num_dimensions);
-
-    set_default_velocity(cognitive_velocity, num_dimensions);
-    set_default_velocity(social_velocity, num_dimensions);
 
     //velocity = w * velocity
     multiplies_coefficient_by_velocity(pso_config.w, particle->velocity, num_dimensions);
@@ -1153,6 +1158,8 @@ void update_position
             }
         }
     }
+
+    adjust_particle_by_coord(&(particle->position), seq, lattice, num_dimensions);
 
     particle->position.feasible = 1;
 

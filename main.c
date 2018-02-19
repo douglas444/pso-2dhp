@@ -2,11 +2,24 @@
 #include <stdlib.h>
 #include <time.h>
 #include <string.h>
+#include <sys/time.h>
+#include <sys/resource.h>
 #include "pso.h"
 #include "file.h"
 
+void set_max_priority() {
+    if (setpriority(PRIO_PROCESS, 0, -20) == -1) {
+        printf("Error in function main: setpriority() failed\n");
+        exit(1);
+
+    }
+}
+
 int main(int argc, char **argv)
 {
+
+    //set_max_priority();
+
     int i;
     Pso_config pso_config;
     int num_dimensions;
@@ -21,11 +34,12 @@ int main(int argc, char **argv)
     int seed = -1;
     Pso_result pso_result;
 
+
     //Read file----------------------------------------------------------------
 
     if (argc < 3)
     {
-        printf("Invalid parameters\n");
+        printf("Error in function main: Invalid program parameters\n");
         exit(1);
     }
 
