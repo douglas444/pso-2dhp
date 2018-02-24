@@ -39,7 +39,7 @@ struct pso_result
     float final_population_solution_rate;
 };
 
-typedef enum daemon daemon;
+typedef enum daemon Daemon;
 typedef enum polarity Polarity;
 typedef struct pso_config Pso_config;
 typedef struct pso_result Pso_result;

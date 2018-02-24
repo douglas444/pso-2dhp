@@ -4,9 +4,7 @@
 #include <time.h>
 #include "pso.h"
 
-
 #define MAX(a,b) (((a) > (b)) ? (a) : (b))
-
 
 enum direction
 {
@@ -80,7 +78,24 @@ typedef struct particle Particle;
 typedef enum direction Direction;
 typedef enum pm_type Pm_type;
 
+void* smalloc(int mem_size)
+/* ====================================
+ * Allocates memory
+ * ====================================
+ */
+{
+    void *mem_pos = (void*) malloc(mem_size);
 
+    if (mem_pos == NULL)
+    {
+        printf("ERROR: aco.c/smalloc(): \"Unable to allocate memory\"\n");
+        exit(1);
+    }
+    else
+    {
+        return mem_pos;
+    }
+}
 
 Coord create_new_coord(int x, int y)
 /* ===========================================================
@@ -94,8 +109,6 @@ Coord create_new_coord(int x, int y)
     return coord;
 }
 
-
-
 Coord subtract_coord
 (
     Coord c1,
@@ -107,14 +120,10 @@ Coord subtract_coord
  */
 {
     Coord c3;
-
     c3.x = c1.x - c2.x;
     c3.y = c1.y - c2.y;
-
     return c3;
 }
-
-
 
 int lateral_adj(Coord c1, Coord c2)
 /* ===============================================
@@ -130,8 +139,6 @@ int lateral_adj(Coord c1, Coord c2)
 
 }
 
-
-
 int abs_direction_by_move(Coord move)
 /* =====================================
  * Calculates absolute direction by move
@@ -146,7 +153,7 @@ int abs_direction_by_move(Coord move)
         }
         else
         {
-            printf("Error in function aco.c/abs_direction_by_move: Invalid value for parameter move\n");
+            printf("ERROR: aco.c/abs_direction_by_move(): \"Invalid value for parameter move\"\n");
             exit(1);
         }
     }
@@ -162,18 +169,16 @@ int abs_direction_by_move(Coord move)
         }
         else
         {
-            printf("Error in function aco.c/abs_direction_by_move: Invalid value for parameter move\n");
+            printf("ERROR: aco.c/abs_direction_by_move(): \"Invalid value for parameter move\"\n");
             exit(1);
         }
     }
     else
     {
-        printf("Error in function aco.c/abs_direction_by_move: Invalid value for parameter move\n");
+        printf("ERROR: aco.c/abs_direction_by_move(): \"Invalid value for parameter move\"\n");
         exit(1);
     }
 }
-
-
 
 int direction_by_move(Coord prev_move, Coord move)
 /* ===========================================================
@@ -198,7 +203,7 @@ int direction_by_move(Coord prev_move, Coord move)
         }
         else
         {
-            printf("Error in function aco.c/direction_by_move: Invalid values for parameters\n");
+            printf("ERROR: aco.c/direction_by_move(): \"Invalid values for parameters\"\n");
             exit(1);
         }
     }
@@ -214,13 +219,11 @@ int direction_by_move(Coord prev_move, Coord move)
         }
         else
         {
-            printf("Error in function aco.c/direction_by_move: Invalid values for parameters\n");
+            printf("ERROR: aco.c/direction_by_move(): \"Invalid values for parameters\"\n");
             exit(1);
         }
     }
 }
-
-
 
 Coord straight(Coord prev_move)
 /* =================================================================
@@ -252,14 +255,12 @@ Coord straight(Coord prev_move)
     }
     else
     {
-        printf("Error in function aco.c/straight: Invalid value for parameter prev_move\n");
+        printf("ERROR: aco.c/straight(): \"Invalid value for parameter prev_move\"\n");
         exit(1);
     }
 
     return move;
 }
-
-
 
 Coord left(Coord prev_move)
 /* =============================================================
@@ -291,14 +292,12 @@ Coord left(Coord prev_move)
     }
     else
     {
-        printf("Error in function aco.c/left: Invalid value for parameter prev_move\n");
+        printf("ERROR: aco.c/left(): \"Invalid value for parameter prev_move\"\n");
         exit(1);
     }
 
     return move;
 }
-
-
 
 Coord right(Coord prev_move)
 /* ==============================================================
@@ -330,14 +329,12 @@ Coord right(Coord prev_move)
     }
     else
     {
-        printf("Error in function aco.c/right: Invalid value for parameter prev_move\n");
+        printf("ERROR: aco.c/right(): \"Invalid value for parameter prev_move\"\n");
         exit(1);
     }
 
     return move;
 }
-
-
 
 char* position_to_string
 (
@@ -353,7 +350,7 @@ char* position_to_string
     int i, direction;
     char *directions;
 
-    directions = (char*) malloc(sizeof(char) * num_dimensions);
+    directions = (char*) smalloc(sizeof(char) * num_dimensions);
 
     for (i = 0; i < num_dimensions - 1; ++i)
     {
@@ -390,8 +387,6 @@ char* position_to_string
     return directions;
 }
 
-
-
 void init_position
 (
     Position *position,
@@ -404,9 +399,9 @@ void init_position
 {
     int i;
 
-    position->coord = (Coord*) malloc(sizeof(Coord) * num_dimensions);
-    position->dir = (Direction*) malloc(sizeof(Direction) * (num_dimensions - 1));
-    position->fitness_by_edge = (int*) malloc(sizeof(int) * (num_dimensions - 1));
+    position->coord = (Coord*) smalloc(sizeof(Coord) * num_dimensions);
+    position->dir = (Direction*) smalloc(sizeof(Direction) * (num_dimensions - 1));
+    position->fitness_by_edge = (int*) smalloc(sizeof(int) * (num_dimensions - 1));
     position->feasible = 0;
 
     for (i = 0; i < num_dimensions - 1; ++i)
@@ -414,8 +409,6 @@ void init_position
         position->dir[i] = NONE;
     }
 }
-
-
 
 void free_position(Position position)
 /* ============================================
@@ -427,8 +420,6 @@ void free_position(Position position)
     free(position.dir);
     free(position.fitness_by_edge);
 }
-
-
 
 void init_particle
 (
@@ -442,10 +433,8 @@ void init_particle
 {
     init_position(&(particle->position), num_dimensions);
     init_position(&(particle->pbest), num_dimensions);
-    particle->velocity = (Velocity*) malloc(sizeof(Velocity) * (num_dimensions - 1));
+    particle->velocity = (Velocity*) smalloc(sizeof(Velocity) * (num_dimensions - 1));
 }
-
-
 
 void free_particle(Particle particle)
 /* ============================================
@@ -457,8 +446,6 @@ void free_particle(Particle particle)
     free_position(particle.pbest);
     free(particle.velocity);
 }
-
-
 
 void init_variables
 (
@@ -480,25 +467,25 @@ void init_variables
     int i;
     int j;
 
-    *pm_configs = (Pm_config*) malloc(sizeof(Pm_config) * 4 * (num_dimensions - 2));
+    *pm_configs = (Pm_config*) smalloc(sizeof(Pm_config) * 4 * (num_dimensions - 2));
 
-    *lattice = (int**) malloc(sizeof(int*) * (2 * num_dimensions + 1));
+    *lattice = (int**) smalloc(sizeof(int*) * (2 * num_dimensions + 1));
     for (i = 0; i < 2 * num_dimensions + 1; ++i)
     {
-        (*lattice)[i] = (int*) malloc(sizeof(int) * (2 * num_dimensions + 1));
+        (*lattice)[i] = (int*) smalloc(sizeof(int) * (2 * num_dimensions + 1));
         for (j = 0; j < 2 * num_dimensions + 1; ++j)
         {
             (*lattice)[i][j] = -1;
         }
     }
 
-    *best_particle_by_edge = (int*) malloc(sizeof(int) * (num_dimensions - 1));
+    *best_particle_by_edge = (int*) smalloc(sizeof(int) * (num_dimensions - 1));
     for (i = 0; i < num_dimensions - 1; ++i)
     {
         (*best_particle_by_edge)[i] = -1;
     }
 
-    *particles = (Particle*) malloc(sizeof(Particle) * pso_config.population);
+    *particles = (Particle*) smalloc(sizeof(Particle) * pso_config.population);
     for (i = 0; i < pso_config.population; ++i)
     {
         init_particle(&((*particles)[i]), num_dimensions);
@@ -508,8 +495,6 @@ void init_variables
     init_position(pm_best_position, num_dimensions);
     init_position(pm_position, num_dimensions);
 }
-
-
 
 void free_variables
 (
@@ -547,8 +532,6 @@ void free_variables
     free(best_particle_by_edge);
 }
 
-
-
 void set_default_velocity
 (
     Velocity *velocity,
@@ -567,8 +550,6 @@ void set_default_velocity
         velocity[i].s = 0;
     }
 }
-
-
 
 void multiplies_coefficient_by_velocity
 (
@@ -595,8 +576,6 @@ void multiplies_coefficient_by_velocity
     }
 }
 
-
-
 void sum_velocities
 (
     Velocity *v1,
@@ -617,8 +596,6 @@ void sum_velocities
         v1[i].s = MAX(v1[i].s, v2[i].s);
     }
 }
-
-
 
 void subtract_positions
 (
@@ -643,8 +620,6 @@ void subtract_positions
         }
     }
 }
-
-
 
 void multiplies_coefficient_by_position
 (
@@ -691,8 +666,6 @@ void multiplies_coefficient_by_position
     }
 }
 
-
-
 void copy_velocity
 (
     Velocity *copy,
@@ -712,8 +685,6 @@ void copy_velocity
         copy[0].r = velocity[0].r;
     }
 }
-
-
 
 void copy_position
 (
@@ -742,8 +713,6 @@ void copy_position
     }
 }
 
-
-
 void update_velocity
 (
     Pso_config pso_config,
@@ -764,8 +733,8 @@ void update_velocity
     Position cognitive_position;
     Position social_position;
 
-    cognitive_velocity = (Velocity*) malloc(sizeof(Velocity) * num_dimensions);
-    social_velocity = (Velocity*) malloc(sizeof(Velocity) * num_dimensions);
+    cognitive_velocity = (Velocity*) smalloc(sizeof(Velocity) * num_dimensions);
+    social_velocity = (Velocity*) smalloc(sizeof(Velocity) * num_dimensions);
     init_position(&cognitive_position, num_dimensions);
     init_position(&social_position, num_dimensions);
 
@@ -793,8 +762,6 @@ void update_velocity
     free_position(cognitive_position);
     free_position(social_position);
 }
-
-
 
 int calculate_relative_heuristic
 (
@@ -838,8 +805,6 @@ int calculate_relative_heuristic
     return heuristic_value;
 }
 
-
-
 int calculate_heuristic
 (
     int **lattice,
@@ -881,8 +846,6 @@ int calculate_heuristic
 
     return heuristic_value;
 }
-
-
 
 void adjust_particle_by_coord
 (
@@ -932,8 +895,6 @@ void adjust_particle_by_coord
     }
 }
 
-
-
 int random_select(double *probabilities, int len)
 /* =====================================================================
  * Randomly chooses a integer between 0 and len with given probabilities
@@ -956,8 +917,6 @@ int random_select(double *probabilities, int len)
     }
     return result;
 }
-
-
 
 void update_position
 (
@@ -1178,8 +1137,6 @@ void update_position
     }
 }
 
-
-
 void randomize_velocity
 (
     Velocity *velocity,
@@ -1199,8 +1156,6 @@ void randomize_velocity
         velocity[i].r = (double)rand()/RAND_MAX;
     }
 }
-
-
 
 void initializes_population
 (
@@ -1250,7 +1205,6 @@ void initializes_population
 
 }
 
-
 int move_amino_acid
 (
     int current_energy,
@@ -1280,8 +1234,6 @@ int move_amino_acid
 
     return current_energy;
 }
-
-
 
 int apply_pm
 (
@@ -1399,8 +1351,6 @@ int apply_pm
     return position.fitness;
 }
 
-
-
 int generate_pm_config
 (
     Pm_config *config,
@@ -1442,8 +1392,6 @@ int generate_pm_config
     /* Impossible generate the pull-move configuration */
     return 0;
 }
-
-
 
 void generate_pm_configs
 (
@@ -1494,8 +1442,6 @@ void generate_pm_configs
     if (result) configs[(*config_index)++] = config;
 
 }
-
-
 
 int pm_search
 (
@@ -1603,8 +1549,6 @@ int pm_search
     return change;
 }
 
-
-
 Pso_result pso_run
 (
     Pso_config pso_config,
@@ -1632,7 +1576,7 @@ Pso_result pso_run
     Pso_result pso_result;
     clock_t t0;
 
-    /**/pso_result.energy_evolution = (int*) malloc(sizeof(int) * pso_config.iterations);
+    /**/pso_result.energy_evolution = (int*) smalloc(sizeof(int) * pso_config.iterations);
     /**/t0 = clock();
 
     //Sets seed
@@ -1727,7 +1671,7 @@ Pso_result pso_run
         }
     }
 
-    /**/pso_result.time = (clock() - t0)/(double)CLOCKS_PER_SEC;
+    /**/pso_result.time = (clock() - t0) / (double)CLOCKS_PER_SEC;
     /**/pso_result.energy = gbest.fitness;
     /**/pso_result.final_population_avg = 0;
     /**/pso_result.final_population_solution_rate = 0;
