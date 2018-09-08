@@ -4,9 +4,11 @@ enum daemon
     PULL_MOVE
 };
 
-enum collision_handler
+enum constructor
 {
-    PARTIAL_COPY = 0
+    XIAO_LI_HU_2014 = 0,
+    HU_ZHANG_LI_2009 = 1,
+    SHMYGELSKA_HOOS_2003 = 2
 };
 
 enum polarity
@@ -23,7 +25,8 @@ struct pso_config
     double c2;
     double w;
     double beta;
-    enum collision_handler collision_handler;
+    double min_probability;
+    enum constructor constructor;
     enum daemon daemon;
 };
 
@@ -39,9 +42,4 @@ struct pso_result
     float final_population_solution_rate;
 };
 
-typedef enum daemon Daemon;
-typedef enum polarity Polarity;
-typedef struct pso_config Pso_config;
-typedef struct pso_result Pso_result;
-
-Pso_result pso_run(Pso_config pso_config, Polarity *seq, int num_dimensions, int *seed);
+struct pso_result pso_run(struct pso_config pso_config, enum polarity *seq, int num_dimensions, int *seed);

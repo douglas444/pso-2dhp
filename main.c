@@ -8,20 +8,20 @@
 #include "file.h"
 
 void set_max_priority();
-Daemon string_to_daemon(char *daemon);
-Daemon string_to_collision_handler(char *collision_handler);
-Daemon char_to_polarity(char polarity);
-void read_inputs(Pso_config *pso_config, Polarity **sequence, int *num_dimensions, char **argv, char **char_sequence);
+enum daemon string_to_daemon(char *daemon);
+enum daemon string_to_collision_handler(char *constructor);
+enum daemon char_to_polarity(char polarity);
+void read_inputs(struct pso_config *pso_config, enum polarity **sequence, int *num_dimensions, char **argv, char **char_sequence);
 
 int main(int argc, char **argv)
 {
-    set_max_priority();
+    //set_max_priority();
 
     int i;
     char *char_sequence;
-    Pso_config pso_config;
-    Pso_result pso_result;
-    Polarity *sequence;
+    struct pso_config pso_config;
+    struct pso_result pso_result;
+    enum polarity *sequence;
     int num_dimensions;
     int seed = -1;
 
@@ -69,7 +69,7 @@ void set_max_priority() {
 
 }
 
-Daemon string_to_daemon(char *daemon)
+enum daemon string_to_daemon(char *daemon)
 {
     if (strcmp(daemon, "WITHOUT_DAEMON") == 0)
     {
@@ -86,11 +86,19 @@ Daemon string_to_daemon(char *daemon)
     }
 }
 
-Daemon string_to_collision_handler(char *collision_handler)
+enum daemon string_to_collision_handler(char *constructor)
 {
-    if (strcmp(collision_handler, "PARTIAL_COPY") == 0)
+    if (strcmp(constructor, "XIAO_LI_HU_2014") == 0)
     {
-        return PARTIAL_COPY;
+        return XIAO_LI_HU_2014;
+    }
+    else if (strcmp(constructor, "HU_ZHANG_LI_2009") == 0)
+    {
+        return HU_ZHANG_LI_2009;
+    }
+    else if (strcmp(constructor, "SHMYGELSKA_HOOS_2003") == 0)
+    {
+        return SHMYGELSKA_HOOS_2003;
     }
     else
     {
@@ -99,7 +107,7 @@ Daemon string_to_collision_handler(char *collision_handler)
     }
 }
 
-Daemon char_to_polarity(char polarity)
+enum daemon char_to_polarity(char polarity)
 {
     if (polarity == 'H')
     {
@@ -117,11 +125,11 @@ Daemon char_to_polarity(char polarity)
 
 }
 
-void read_inputs(Pso_config *pso_config, Polarity **sequence, int *num_dimensions, char **argv, char **char_sequence)
+void read_inputs(struct pso_config *pso_config, enum polarity **sequence, int *num_dimensions, char **argv, char **char_sequence)
 {
     int i;
     char *input_file;
-    char *collision_handler;
+    char *constructor;
     char *daemon;
     char *sequence_key;
 
@@ -141,19 +149,20 @@ void read_inputs(Pso_config *pso_config, Polarity **sequence, int *num_dimension
     pso_config->c1 = char_to_double(get_key_value(input_file, "c1"));
     pso_config->c2 = char_to_double(get_key_value(input_file, "c2"));
     pso_config->w = char_to_double(get_key_value(input_file, "w"));
+    pso_config->min_probability = char_to_double(get_key_value(input_file, "min-probability"));
     pso_config->iterations = char_to_int(get_key_value(input_file, "iterations"));
 
     *char_sequence = get_key_value(input_file, sequence_key);
-    collision_handler = get_key_value(input_file, "collision-handler");
+    constructor = get_key_value(input_file, "collision-handler");
     daemon = get_key_value(input_file, "daemon");
 
     *num_dimensions = strlen(*char_sequence);
     pso_config->population = char_to_int(get_key_value(input_file,
         (*num_dimensions <= 25) ? "small-instances-population" : "big-instances-population"));
     pso_config->daemon = string_to_daemon(daemon);
-    pso_config->collision_handler = string_to_collision_handler(collision_handler);
+    pso_config->constructor = string_to_collision_handler(constructor);
 
-    *sequence = (Polarity*) malloc(*num_dimensions * sizeof(Polarity));
+    *sequence = (enum polarity*) malloc(*num_dimensions * sizeof(enum polarity));
     if (*sequence == NULL)
     {
         printf("ERROR: main.c/read_inputs(): \"Unable to allocate memory\"\n");
@@ -166,7 +175,7 @@ void read_inputs(Pso_config *pso_config, Polarity **sequence, int *num_dimension
 
     //free
     free(input_file);
-    free(collision_handler);
+    free(constructor);
     free(daemon);
     free(sequence_key);
 }

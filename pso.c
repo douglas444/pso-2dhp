@@ -47,6 +47,7 @@ struct candidate
     int heuristic;
     struct coord coord;
     struct coord move;
+    int readjusted;
 };
 
 struct velocity
@@ -68,16 +69,6 @@ struct pm_config
 
 };
 
-typedef struct coord Coord;
-typedef struct candidate Candidate;
-typedef struct velocity Velocity;
-typedef struct particle Particle;
-typedef struct pm_config Pm_config;
-typedef struct position Position;
-typedef struct particle Particle;
-typedef enum direction Direction;
-typedef enum pm_type Pm_type;
-
 void* smalloc(int mem_size)
 /* ====================================
  * Allocates memory
@@ -97,35 +88,35 @@ void* smalloc(int mem_size)
     }
 }
 
-Coord create_new_coord(int x, int y)
+struct coord create_new_coord(int x, int y)
 /* ===========================================================
- * Returns a new variables of type Coord with the given values
+ * Returns a new variables of type struct coord with the given values
  * ===========================================================
  */
 {
-    Coord coord;
+    struct coord coord;
     coord.x = x;
     coord.y = y;
     return coord;
 }
 
-Coord subtract_coord
+struct coord subtract_coord
 (
-    Coord c1,
-    Coord c2
+    struct coord c1,
+    struct coord c2
 )
 /* =======================================================
  * Calculates the difference between two given coordinates
  * =======================================================
  */
 {
-    Coord c3;
+    struct coord c3;
     c3.x = c1.x - c2.x;
     c3.y = c1.y - c2.y;
     return c3;
 }
 
-int lateral_adj(Coord c1, Coord c2)
+int lateral_adj(struct coord c1, struct coord c2)
 /* ===============================================
  * Check if two coordinates are laterally adjacent
  * ===============================================
@@ -139,7 +130,7 @@ int lateral_adj(Coord c1, Coord c2)
 
 }
 
-int abs_direction_by_move(Coord move)
+int abs_direction_by_move(struct coord move)
 /* =====================================
  * Calculates absolute direction by move
  * =====================================
@@ -180,7 +171,7 @@ int abs_direction_by_move(Coord move)
     }
 }
 
-int direction_by_move(Coord prev_move, Coord move)
+int direction_by_move(struct coord prev_move, struct coord move)
 /* ===========================================================
  * Calculates relative direction between two consecutive moves
  * ===========================================================
@@ -225,13 +216,13 @@ int direction_by_move(Coord prev_move, Coord move)
     }
 }
 
-Coord straight(Coord prev_move)
+struct coord straight(struct coord prev_move)
 /* =================================================================
  * Calculates straight move corresponding to the given previous move
  * =================================================================
  */
 {
-    Coord move;
+    struct coord move;
 
     if (prev_move.x == 1)
     {
@@ -262,13 +253,13 @@ Coord straight(Coord prev_move)
     return move;
 }
 
-Coord left(Coord prev_move)
+struct coord left(struct coord prev_move)
 /* =============================================================
  * Calculates left move corresponding to the given previous move
  * =============================================================
  */
 {
-    Coord move;
+    struct coord move;
 
     if (prev_move.x == 1)
     {
@@ -299,13 +290,13 @@ Coord left(Coord prev_move)
     return move;
 }
 
-Coord right(Coord prev_move)
+struct coord right(struct coord prev_move)
 /* ==============================================================
  * Calculates right move corresponding to the given previous move
  * ==============================================================
  */
 {
-    Coord move;
+    struct coord move;
 
     if (prev_move.x == 1)
     {
@@ -338,7 +329,7 @@ Coord right(Coord prev_move)
 
 char* position_to_string
 (
-    Position position,
+    struct position position,
     int num_dimensions
 )
 /* ===============================================
@@ -346,7 +337,7 @@ char* position_to_string
  * ===============================================
  */
 {
-    Coord move, prev_move;
+    struct coord move, prev_move;
     int i, direction;
     char *directions;
 
@@ -389,18 +380,18 @@ char* position_to_string
 
 void init_position
 (
-    Position *position,
+    struct position *position,
     int num_dimensions
 )
 /* ================================================
- * Allocates memory to Position structure variables
+ * Allocates memory to struct position structure variables
  * ================================================
  */
 {
     int i;
 
-    position->coord = (Coord*) smalloc(sizeof(Coord) * num_dimensions);
-    position->dir = (Direction*) smalloc(sizeof(Direction) * (num_dimensions - 1));
+    position->coord = (struct coord*) smalloc(sizeof(struct coord) * num_dimensions);
+    position->dir = (enum direction*) smalloc(sizeof(enum direction) * (num_dimensions - 1));
     position->fitness_by_edge = (int*) smalloc(sizeof(int) * (num_dimensions - 1));
     position->feasible = 0;
 
@@ -410,9 +401,9 @@ void init_position
     }
 }
 
-void free_position(Position position)
+void free_position(struct position position)
 /* ============================================
- * Frees memory of Position structure variables
+ * Frees memory of struct position structure variables
  * ============================================
  */
 {
@@ -423,22 +414,22 @@ void free_position(Position position)
 
 void init_particle
 (
-    Particle *particle,
+    struct particle *particle,
     int num_dimensions
 )
 /* ================================================
- * Allocates memory to Particle structure variables
+ * Allocates memory to struct particle structure variables
  * ================================================
  */
 {
     init_position(&(particle->position), num_dimensions);
     init_position(&(particle->pbest), num_dimensions);
-    particle->velocity = (Velocity*) smalloc(sizeof(Velocity) * (num_dimensions - 1));
+    particle->velocity = (struct velocity*) smalloc(sizeof(struct velocity) * (num_dimensions - 1));
 }
 
-void free_particle(Particle particle)
+void free_particle(struct particle particle)
 /* ============================================
- * Frees memory of Particle structure variables
+ * Frees memory of struct particle structure variables
  * ============================================
  */
 {
@@ -449,14 +440,14 @@ void free_particle(Particle particle)
 
 void init_variables
 (
-    Pso_config pso_config,
-    Pm_config **pm_configs,
+    struct pso_config pso_config,
+    struct pm_config **pm_configs,
     int ***lattice,
     int **best_particle_by_edge,
-    Particle **particles,
-    Position *gbest,
-    Position *pm_best_position,
-    Position *pm_position,
+    struct particle **particles,
+    struct position *gbest,
+    struct position *pm_best_position,
+    struct position *pm_position,
     int num_dimensions
 )
 /* =======================================
@@ -467,7 +458,7 @@ void init_variables
     int i;
     int j;
 
-    *pm_configs = (Pm_config*) smalloc(sizeof(Pm_config) * 4 * (num_dimensions - 2));
+    *pm_configs = (struct pm_config*) smalloc(sizeof(struct pm_config) * 4 * (num_dimensions - 2));
 
     *lattice = (int**) smalloc(sizeof(int*) * (2 * num_dimensions + 1));
     for (i = 0; i < 2 * num_dimensions + 1; ++i)
@@ -485,7 +476,7 @@ void init_variables
         (*best_particle_by_edge)[i] = -1;
     }
 
-    *particles = (Particle*) smalloc(sizeof(Particle) * pso_config.population);
+    *particles = (struct particle*) smalloc(sizeof(struct particle) * pso_config.population);
     for (i = 0; i < pso_config.population; ++i)
     {
         init_particle(&((*particles)[i]), num_dimensions);
@@ -498,13 +489,13 @@ void init_variables
 
 void free_variables
 (
-    Pso_config pso_config,
+    struct pso_config pso_config,
     int **lattice,
-    Particle *particles,
-    Position pm_best_position,
-    Position pm_position,
-    Position gbest,
-    Pm_config *pm_configs,
+    struct particle *particles,
+    struct position pm_best_position,
+    struct position pm_position,
+    struct position gbest,
+    struct pm_config *pm_configs,
     int *best_particle_by_edge,
     int num_dimensions
 )
@@ -534,7 +525,7 @@ void free_variables
 
 void set_default_velocity
 (
-    Velocity *velocity,
+    struct velocity *velocity,
     int num_dimensions
 )
 /* =====================================================
@@ -554,7 +545,7 @@ void set_default_velocity
 void multiplies_coefficient_by_velocity
 (
     double coefficient,
-    Velocity *velocity,
+    struct velocity *velocity,
     int num_dimensions
 )
 /* =========================================================================================
@@ -578,8 +569,8 @@ void multiplies_coefficient_by_velocity
 
 void sum_velocities
 (
-    Velocity *v1,
-    Velocity *v2,
+    struct velocity *v1,
+    struct velocity *v2,
     int num_dimensions
 )
 /* =======================================================
@@ -599,8 +590,8 @@ void sum_velocities
 
 void subtract_positions
 (
-    Position *p1,
-    Position p2,
+    struct position *p1,
+    struct position p2,
     int num_dimensions
 )
 /* ============================================================
@@ -623,9 +614,9 @@ void subtract_positions
 
 void multiplies_coefficient_by_position
 (
-    Velocity *velocity,
+    struct velocity *velocity,
     double coefficient,
-    Position position,
+    struct position position,
     int num_dimensions
 )
 /* =========================================================================================
@@ -668,8 +659,8 @@ void multiplies_coefficient_by_position
 
 void copy_velocity
 (
-    Velocity *copy,
-    Velocity *velocity,
+    struct velocity *copy,
+    struct velocity *velocity,
     int num_dimensions
 )
 /* ==============================================
@@ -688,8 +679,8 @@ void copy_velocity
 
 void copy_position
 (
-    Position *copy,
-    Position position,
+    struct position *copy,
+    struct position position,
     int num_dimensions
 )
 /* ==============================================
@@ -715,9 +706,9 @@ void copy_position
 
 void update_velocity
 (
-    Pso_config pso_config,
-    Particle *particle,
-    Position gbest,
+    struct pso_config pso_config,
+    struct particle *particle,
+    struct position gbest,
     int num_dimensions
 )
 /* ==================================================
@@ -728,13 +719,13 @@ void update_velocity
     double r1;
     double r2;
 
-    Velocity *cognitive_velocity;
-    Velocity *social_velocity;
-    Position cognitive_position;
-    Position social_position;
+    struct velocity *cognitive_velocity;
+    struct velocity *social_velocity;
+    struct position cognitive_position;
+    struct position social_position;
 
-    cognitive_velocity = (Velocity*) smalloc(sizeof(Velocity) * num_dimensions);
-    social_velocity = (Velocity*) smalloc(sizeof(Velocity) * num_dimensions);
+    cognitive_velocity = (struct velocity*) smalloc(sizeof(struct velocity) * num_dimensions);
+    social_velocity = (struct velocity*) smalloc(sizeof(struct velocity) * num_dimensions);
     init_position(&cognitive_position, num_dimensions);
     init_position(&social_position, num_dimensions);
 
@@ -767,8 +758,8 @@ int calculate_relative_heuristic
 (
     int **lattice,
     int amino_acid_index,
-    Coord pos,
-    Polarity *seq
+    struct coord pos,
+    enum polarity *seq
 )
 /* =================================================================================
  * Calculates the number of H-H contacts if a H amino-acid occupy the given position
@@ -809,8 +800,8 @@ int calculate_heuristic
 (
     int **lattice,
     int amino_acid_index,
-    Coord pos,
-    Polarity *seq
+    struct coord pos,
+    enum polarity *seq
 )
 /* =================================================================================
  * Calculates the number of H-H contacts if a H amino-acid occupy the given position
@@ -849,8 +840,8 @@ int calculate_heuristic
 
 void adjust_particle_by_coord
 (
-    Position *position,
-    Polarity *seq,
+    struct position *position,
+    enum polarity *seq,
     int **lattice,
     int num_dimensions
 )
@@ -860,9 +851,9 @@ void adjust_particle_by_coord
  */
 {
     int i;
-    Coord move;
-    Coord prev_move;
-    Direction direction;
+    struct coord move;
+    struct coord prev_move;
+    enum direction direction;
     position->fitness = 0;
 
     for (i = 0; i < num_dimensions - 1; ++i)
@@ -918,16 +909,281 @@ int random_select(double *probabilities, int len)
     return result;
 }
 
-void update_position
+int execute_look_ahead(int **lattice, struct coord position, int num_dimensions, int amin_index)
+{
+    int right;
+    int left;
+    int down;
+    int up;
+
+    int position_is_invalid;
+
+    right = lattice[position.x + 1][position.y];
+    left = lattice[position.x - 1][position.y];
+    up = lattice[position.x][position.y + 1];
+    down = lattice[position.x][position.y - 1];
+
+    if (right > -1 && left > -1 && up > -1 && down > -1) {
+        position_is_invalid = 1;
+    } else {
+        position_is_invalid = 0;
+    }
+
+    if (amin_index == 0 || amin_index == num_dimensions - 1)
+    {
+        position_is_invalid = 0;
+    }
+
+    return !position_is_invalid;
+}
+
+void update_position_1
 (
-    Particle *particle,
+    struct particle *particle,
     int **lattice,
-    Polarity *seq,
+    enum polarity *seq,
     int num_dimensions,
-    Pso_config pso_config,
+    struct pso_config pso_config,
     int *best_particle_by_edge,
     int particle_index,
-    Particle *particles
+    struct particle *particles
+)
+/* ============================================================================
+ * Sets particles position to feasible position built using particle's velocity
+ * ============================================================================
+ */
+{
+    int i;
+
+    int num_candidates;
+    int selected_candidate;
+    double sum_probabilities;
+    double probabilities[3];
+    struct coord candidate_moves[3];
+    struct candidate candidates[3];
+
+    struct coord foward_position;
+    struct coord last_move;
+
+    int curr_amin;
+    int prev_amin;
+    int next_amin;
+
+    int left_extremity;
+    int right_extremity;
+    int *extremity;
+
+    int side;
+    int last_unfold_side;
+    int unfold_size;
+    particle->pbest.fitness = 0;
+
+    //Defines start edge direction
+
+    left_extremity = ceil(num_dimensions / 2);
+    right_extremity = ceil(num_dimensions / 2) + 1;
+
+    particle->position.coord[left_extremity] = create_new_coord(num_dimensions, num_dimensions);
+    particle->position.coord[right_extremity] = create_new_coord(num_dimensions + 1, num_dimensions);
+
+    lattice[particle->position.coord[left_extremity].x][particle->position.coord[left_extremity].y] = left_extremity;
+    lattice[particle->position.coord[right_extremity].x][particle->position.coord[right_extremity].y] = right_extremity;
+
+    side = 0;//left
+    last_unfold_side = -1;
+
+
+    //Constructor loop
+
+    while (left_extremity > 0 || right_extremity < num_dimensions - 1)
+    {
+        if (side == 0 && left_extremity == 0)
+        {
+            side = 1;
+        }
+        else if (side == 1 && right_extremity == num_dimensions - 1)
+        {
+            side = 0;
+        }
+
+        if (side == 0)
+        {
+            curr_amin = left_extremity;
+            next_amin = left_extremity - 1;
+            prev_amin = left_extremity + 1;
+            extremity = &left_extremity;
+        }
+        else
+        {
+            curr_amin = right_extremity;
+            next_amin = right_extremity + 1;
+            prev_amin = right_extremity - 1;
+            extremity = &right_extremity;
+        }
+
+        last_move = subtract_coord(particle->position.coord[curr_amin], particle->position.coord[prev_amin]);
+
+        sum_probabilities = 0;
+        num_candidates = 0;
+
+        candidate_moves[0] = left(last_move);
+        candidate_moves[1] = right(last_move);
+        candidate_moves[2] = straight(last_move);
+
+        //Defines candidate directions
+
+        //For each direction
+        for (i = 0; i < 3; ++i)
+        {
+
+            foward_position = create_new_coord(particle->position.coord[curr_amin].x + candidate_moves[i].x,
+                                               particle->position.coord[curr_amin].y + candidate_moves[i].y);
+
+            //If the next position in this direction is not occupied, turns current direction into a candidate
+            if (lattice[foward_position.x][foward_position.y] == -1 &&
+                execute_look_ahead(lattice, foward_position, num_dimensions, next_amin))
+            {
+                candidates[num_candidates].move = candidate_moves[i];
+                candidates[num_candidates].coord = foward_position;
+
+                if (seq[next_amin] == H)
+                {
+                    candidates[num_candidates].heuristic =
+                        calculate_heuristic(lattice, next_amin, foward_position, seq);
+                }
+                else
+                {
+                    candidates[num_candidates].heuristic = 0;
+                }
+
+
+
+                probabilities[num_candidates] = pow(exp((double) candidates[num_candidates].heuristic / 0.3), pso_config.beta);
+
+                switch(i) {
+                case LEFT:
+                    probabilities[num_candidates] *= particle->velocity[curr_amin].l;
+                    break;
+                case RIGHT:
+                    probabilities[num_candidates] *= particle->velocity[curr_amin].r;
+                    break;
+                case STRAIGHT:
+                    probabilities[num_candidates] *= particle->velocity[curr_amin].s;
+                    break;
+                default:
+                    break;
+                }
+
+                sum_probabilities += probabilities[num_candidates];
+                ++num_candidates;
+            }
+
+        }
+
+        for (i = 0; i < num_candidates; ++i)
+        {
+            probabilities[i] = probabilities[i] / sum_probabilities;
+        }
+
+        //Selects a candidate
+
+        if (num_candidates == 0)
+        {
+            selected_candidate = -1;
+        }
+        else if (sum_probabilities == 0)
+        {
+            selected_candidate = rand() % num_candidates;
+        }
+        else if (num_candidates > 1)
+        {
+            selected_candidate = random_select(probabilities, num_candidates);
+        }
+        else if (num_candidates == 1)
+        {
+            selected_candidate = 0;
+        }
+
+        //Update conformation
+
+        if (selected_candidate != -1)
+        {
+            *extremity = next_amin;
+
+            particle->position.fitness -= candidates[selected_candidate].heuristic;
+            particle->position.coord[*extremity] = candidates[selected_candidate].coord;
+            lattice[particle->position.coord[*extremity].x][particle->position.coord[*extremity].y] = *extremity;
+            side = !side;
+
+        }
+        else
+        {
+            //When is impossible continue the fold process
+
+            if (right_extremity == ceil(num_dimensions / 2) + 1 ||
+                (last_unfold_side == 1 && left_extremity != ceil(num_dimensions / 2)))
+
+            {
+                unfold_size = 1 + rand() % ((int) ceil(num_dimensions / 2) - left_extremity);
+                extremity = &left_extremity;
+                last_unfold_side = 0;
+
+                curr_amin = *extremity;
+                next_amin = curr_amin - 1;
+                prev_amin = curr_amin + 1;
+            }
+            else
+            {
+
+                unfold_size = 1 + rand() % (right_extremity - ((int) ceil(num_dimensions / 2) + 1));
+                extremity = &right_extremity;
+                last_unfold_side = 1;
+
+                curr_amin = *extremity;
+                next_amin = curr_amin + 1;
+                prev_amin = curr_amin - 1;
+            }
+
+
+            for (i = 0; i < unfold_size; ++i)
+            {
+                if (seq[*extremity] == H)
+                {
+                    particle->position.fitness += calculate_heuristic(lattice, *extremity, particle->position.coord[*extremity], seq);
+                }
+                lattice[particle->position.coord[*extremity].x][particle->position.coord[*extremity].y] = -1;
+
+                next_amin = *extremity;
+                curr_amin = prev_amin;
+                prev_amin = curr_amin - (next_amin - curr_amin);
+
+                *extremity = curr_amin;
+            }
+        }
+    }
+
+
+    adjust_particle_by_coord(&(particle->position), seq, lattice, num_dimensions);
+
+    particle->position.feasible = 1;
+
+
+    for (i = 0; i < num_dimensions; ++i)
+    {
+        lattice[particle->position.coord[i].x][particle->position.coord[i].y] = -1;
+    }
+}
+
+void update_position_0
+(
+    struct particle *particle,
+    int **lattice,
+    enum polarity *seq,
+    int num_dimensions,
+    struct pso_config pso_config,
+    int *best_particle_by_edge,
+    int particle_index,
+    struct particle *particles
 )
 /* ============================================================================
  * Sets particles position to feasible position built using particle's velocity
@@ -936,15 +1192,19 @@ void update_position
 {
     int i;
     int j;
+
     int num_candidates;
     int selected_candidate;
     double sum_probabilities;
     double probabilities[3];
-    Coord curr_coord;
-    Coord move;
-    Coord candidate_move[3];
-    Candidate candidates[3];
-    Position copied_position;
+    struct coord candidate_moves[3];
+    struct candidate candidates[3];
+
+    struct coord curr_coord;
+    struct coord foward_coord;
+    struct coord last_move;
+
+    struct position copied_position;
 
     particle->position.fitness = 0;
     particle->position.fitness_by_edge[0] = 0;
@@ -954,9 +1214,9 @@ void update_position
     lattice[num_dimensions][num_dimensions] = 0;
     particle->position.coord[0] = create_new_coord(num_dimensions, num_dimensions);
 
-    move = create_new_coord(0, 1);
-    curr_coord = create_new_coord(particle->position.coord[0].x + move.x,
-                                  particle->position.coord[0].y + move.y);
+    last_move = create_new_coord(0, 1);
+    curr_coord = create_new_coord(particle->position.coord[0].x + last_move.x,
+                                  particle->position.coord[0].y + last_move.y);
     lattice[curr_coord.x][curr_coord.y] = 1;
     particle->position.coord[1] = curr_coord;
 
@@ -969,9 +1229,9 @@ void update_position
         sum_probabilities = 0;
         num_candidates = 0;
 
-        candidate_move[0] = left(move);
-        candidate_move[1] = right(move);
-        candidate_move[2] = straight(move);
+        candidate_moves[0] = left(last_move);
+        candidate_moves[1] = right(last_move);
+        candidate_moves[2] = straight(last_move);
 
         //DEFINES CANDIDATES DIRECTION
 
@@ -979,17 +1239,19 @@ void update_position
         for (j = 0; j < 3; ++j)
         {
 
+            foward_coord = create_new_coord(curr_coord.x + candidate_moves[j].x,
+                                            curr_coord.y + candidate_moves[j].y);
+
             //If the next coord in this direction is not occupied, turns current direction into a candidate
-            if (lattice[curr_coord.x + candidate_move[j].x][curr_coord.y + candidate_move[j].y] == -1)
+            if (lattice[foward_coord.x][foward_coord.y] == -1)
             {
-                candidates[num_candidates].move = candidate_move[j];
-                candidates[num_candidates].coord.x = curr_coord.x + candidates[num_candidates].move.x;
-                candidates[num_candidates].coord.y = curr_coord.y + candidates[num_candidates].move.y;
+                candidates[num_candidates].move = candidate_moves[j];
+                candidates[num_candidates].coord = foward_coord;
 
                 if (seq[i + 1] == H)
                 {
                     candidates[num_candidates].heuristic =
-                        calculate_heuristic(lattice, i + 1, candidates[num_candidates].coord, seq);
+                        calculate_heuristic(lattice, i + 1, foward_coord, seq);
                 }
                 else
                 {
@@ -1046,7 +1308,7 @@ void update_position
 
         if (selected_candidate != -1)
         {
-            move = candidates[selected_candidate].move;
+            last_move = candidates[selected_candidate].move;
             curr_coord = candidates[selected_candidate].coord;
             particle->position.fitness_by_edge[i] = particle->position.fitness;
             particle->position.fitness -= candidates[selected_candidate].heuristic;
@@ -1058,62 +1320,52 @@ void update_position
         {
             //WHEN IS IMPOSSIBLE CONTINUE THE FOLD PROCESS
 
-            switch (pso_config.collision_handler)
+            //If theres no another ant to copy
+            if (best_particle_by_edge[i] == -1)
             {
-
-            case PARTIAL_COPY:
-
-                //If theres no another ant to copy
-                if (best_particle_by_edge[i] == -1)
+                for (j = 0; j <= i; ++j)
                 {
-                    for (j = 0; j <= i; ++j)
-                    {
-                        lattice[particle->position.coord[j].x][particle->position.coord[j].y] = -1;
-                    }
-
-                    i = 0;
-                    particle->position.fitness = 0;
-
-                    //Reset first edge
-                    lattice[num_dimensions][num_dimensions] = 0;
-                    particle->position.coord[0] = create_new_coord(num_dimensions, num_dimensions);
-
-                    move = create_new_coord(0, 1);
-                    curr_coord = create_new_coord(particle->position.coord[0].x + move.x,
-                                                  particle->position.coord[0].y + move.y);
-                    lattice[curr_coord.x][curr_coord.y] = 1;
-                    particle->position.coord[1] = curr_coord;
+                    lattice[particle->position.coord[j].x][particle->position.coord[j].y] = -1;
                 }
-                else
+
+                i = 0;
+                particle->position.fitness = 0;
+
+                //Reset first edge
+                lattice[num_dimensions][num_dimensions] = 0;
+                particle->position.coord[0] = create_new_coord(num_dimensions, num_dimensions);
+
+                last_move = create_new_coord(0, 1);
+                curr_coord = create_new_coord(particle->position.coord[0].x + last_move.x,
+                                              particle->position.coord[0].y + last_move.y);
+                lattice[curr_coord.x][curr_coord.y] = 1;
+                particle->position.coord[1] = curr_coord;
+            }
+            else
+            {
+                copied_position = particles[best_particle_by_edge[i]].position;
+
+                for (j = 0; j <= i; ++j)
                 {
-                    copied_position = particles[best_particle_by_edge[i]].position;
-
-                    for (j = 0; j <= i; ++j)
-                    {
-                        lattice[particle->position.coord[j].x][particle->position.coord[j].y] = -1;
-                    }
-
-                    //Copy best ant for index i until i th amino-acid*/
-                    for (j = 0; j <= i; ++j)
-                    {
-                        lattice[copied_position.coord[j].x][copied_position.coord[j].y] = j;
-                        particle->position.coord[j] = copied_position.coord[j];
-                        if (j != i)
-                        {
-                            particle->position.fitness_by_edge[j] = copied_position.fitness_by_edge[j];
-                        }
-                    }
-                    curr_coord = copied_position.coord[i];
-                    particle->position.fitness = copied_position.fitness_by_edge[i];
-
-                    move = create_new_coord(curr_coord.x - copied_position.coord[i - 1].x,
-                                            curr_coord.y - copied_position.coord[i - 1].y);
-                    --i;
+                    lattice[particle->position.coord[j].x][particle->position.coord[j].y] = -1;
                 }
-                break;
 
-            default:
-                break;
+                //Copy best ant for index i until i th amino-acid*/
+                for (j = 0; j <= i; ++j)
+                {
+                    lattice[copied_position.coord[j].x][copied_position.coord[j].y] = j;
+                    particle->position.coord[j] = copied_position.coord[j];
+                    if (j != i)
+                    {
+                        particle->position.fitness_by_edge[j] = copied_position.fitness_by_edge[j];
+                    }
+                }
+                curr_coord = copied_position.coord[i];
+                particle->position.fitness = copied_position.fitness_by_edge[i];
+
+                last_move = create_new_coord(curr_coord.x - copied_position.coord[i - 1].x,
+                                        curr_coord.y - copied_position.coord[i - 1].y);
+                --i;
             }
         }
     }
@@ -1137,9 +1389,275 @@ void update_position
     }
 }
 
+void update_position_2
+(
+    struct particle *particle,
+    int **lattice,
+    enum polarity *seq,
+    int num_dimensions,
+    struct pso_config pso_config,
+    int *best_particle_by_edge,
+    int particle_index,
+    struct particle *particles
+)
+/* ====================================================
+ * Builds ant conformation. Based in Xiao, Li & Hu 2014
+ * ====================================================
+ */
+{
+    int i;
+
+    int num_candidates;
+    int selected_candidate;
+    double sum_probabilities;
+    double probabilities[3];
+    struct coord candidate_moves[3];
+    struct candidate candidates[3];
+
+    struct coord last_move;
+    struct coord foward_position;
+    enum direction forbidden_dir;
+    double left_unfolded_percentage;
+
+    int curr_amin;
+    int prev_amin;
+    int next_amin;
+    int left_extremity;
+    int right_extremity;
+    int *extremity;
+    int side;
+    int unfold_size;
+    int start_point;
+
+    double readjust;
+
+    forbidden_dir = -1;
+    particle->position.fitness = 0;
+
+    //Defines start edge direction
+
+    start_point = rand()%(num_dimensions - 1);
+
+    left_extremity = start_point;
+    right_extremity = start_point + 1;
+
+    particle->position.coord[left_extremity] = create_new_coord(num_dimensions, num_dimensions);
+    particle->position.coord[right_extremity] = create_new_coord(num_dimensions + 1, num_dimensions);
+
+    lattice[particle->position.coord[left_extremity].x][particle->position.coord[left_extremity].y] = left_extremity;
+    lattice[particle->position.coord[right_extremity].x][particle->position.coord[right_extremity].y] = right_extremity;
+
+    //Constructor loop
+
+    while (left_extremity > 0 || right_extremity < num_dimensions - 1)
+    {
+
+        left_unfolded_percentage = (double) left_extremity / (left_extremity + (num_dimensions - right_extremity));
+
+        if ((double) rand() / RAND_MAX < left_unfolded_percentage) {
+            side = 0;//left
+        } else {
+            side = 1;//right
+        }
+
+
+        if (side == 0 && left_extremity == 0)
+        {
+            side = 1;
+        }
+        else if (side == 1 && right_extremity == num_dimensions - 1)
+        {
+            side = 0;
+        }
+
+        if (side == 0)
+        {
+            curr_amin = left_extremity;
+            next_amin = left_extremity - 1;
+            prev_amin = left_extremity + 1;
+            extremity = &left_extremity;
+        }
+        else
+        {
+            curr_amin = right_extremity;
+            next_amin = right_extremity + 1;
+            prev_amin = right_extremity - 1;
+            extremity = &right_extremity;
+        }
+
+        last_move = subtract_coord(particle->position.coord[curr_amin], particle->position.coord[prev_amin]);
+
+        sum_probabilities = 0;
+        num_candidates = 0;
+
+        candidate_moves[0] = left(last_move);
+        candidate_moves[1] = right(last_move);
+        candidate_moves[2] = straight(last_move);
+
+        //Defines candidate direction
+
+        //For each direction
+        for (i = 0; i < 3; ++i)
+        {
+
+            foward_position = create_new_coord(particle->position.coord[curr_amin].x + candidate_moves[i].x,
+                                               particle->position.coord[curr_amin].y + candidate_moves[i].y);
+
+            //If the next position in this direction is not occupied, turns current direction into a candidate
+            if (lattice[foward_position.x][foward_position.y] == -1 &&
+                execute_look_ahead(lattice, foward_position, num_dimensions, next_amin) &&
+                i != forbidden_dir)
+            {
+                candidates[num_candidates].move = candidate_moves[i];
+                candidates[num_candidates].coord = foward_position;
+                candidates[num_candidates].readjusted = 0;
+
+                if (seq[next_amin] == H)
+                {
+                    candidates[num_candidates].heuristic =
+                        calculate_heuristic(lattice, next_amin, foward_position, seq);
+                }
+                else
+                {
+                    candidates[num_candidates].heuristic = 0;
+                }
+
+                probabilities[num_candidates] = pow(exp((double) candidates[num_candidates].heuristic / 0.3), pso_config.beta);
+
+                switch(i) {
+                case LEFT:
+                    probabilities[num_candidates] *= particle->velocity[curr_amin].l;
+                    break;
+                case RIGHT:
+                    probabilities[num_candidates] *= particle->velocity[curr_amin].r;
+                    break;
+                case STRAIGHT:
+                    probabilities[num_candidates] *= particle->velocity[curr_amin].s;
+                    break;
+                default:
+                    break;
+                }
+
+
+                sum_probabilities += probabilities[num_candidates];
+                ++num_candidates;
+            }
+
+        }
+
+        forbidden_dir = -1;
+
+        readjust = 0;
+
+        for (i = 0; i < num_candidates; ++i)
+        {
+            probabilities[i] = probabilities[i] / sum_probabilities;
+
+            if (probabilities[i] < pso_config.min_probability)
+            {
+                candidates[i].readjusted = 1;
+                readjust += pso_config.min_probability - probabilities[i];
+                probabilities[i] = pso_config.min_probability;
+            }
+        }
+
+        if (readjust > 0)
+        {
+            for (i = 0; i < num_candidates; ++i)
+            {
+                if (candidates[i].readjusted == 0)
+                {
+                    probabilities[i] -= (readjust * probabilities[i]);
+                }
+            }
+        }
+
+        //Selects a candidate
+
+        if (num_candidates == 0)
+        {
+            selected_candidate = -1;
+        }
+        else if (sum_probabilities == 0)
+        {
+            selected_candidate = rand() % num_candidates;
+        }
+        else if (num_candidates > 1)
+        {
+            selected_candidate = random_select(probabilities, num_candidates);
+        }
+        else if (num_candidates == 1)
+        {
+            selected_candidate = 0;
+        }
+
+        //Update conformation
+
+        if (selected_candidate != -1)
+        {
+            *extremity = next_amin;
+
+            particle->position.fitness -= candidates[selected_candidate].heuristic;
+            particle->position.coord[*extremity] = candidates[selected_candidate].coord;
+            lattice[particle->position.coord[*extremity].x][particle->position.coord[*extremity].y] = *extremity;
+            side = !side;
+
+        }
+        else
+        {
+            unfold_size = ceil((right_extremity - left_extremity) / 2);
+
+            if (side == 0) {
+
+
+                extremity = &left_extremity;
+                curr_amin = *extremity;
+                next_amin = curr_amin - 1;
+                prev_amin = curr_amin + 1;
+
+            } else {
+
+                extremity = &right_extremity;
+                curr_amin = *extremity;
+                next_amin = curr_amin + 1;
+                prev_amin = curr_amin - 1;
+
+            }
+
+            for (i = 0; i < unfold_size; ++i)
+            {
+                if (seq[*extremity] == H)
+                {
+                    particle->position.fitness += calculate_heuristic(lattice, *extremity, particle->position.coord[*extremity], seq);
+                }
+                lattice[particle->position.coord[*extremity].x][particle->position.coord[*extremity].y] = -1;
+
+                next_amin = *extremity;
+                curr_amin = prev_amin;
+                prev_amin = curr_amin - (next_amin - curr_amin);
+
+                *extremity = curr_amin;
+            }
+
+            forbidden_dir = direction_by_move(
+                subtract_coord(particle->position.coord[curr_amin], particle->position.coord[prev_amin]),
+                subtract_coord(particle->position.coord[next_amin], particle->position.coord[curr_amin]));
+        }
+    }
+
+    adjust_particle_by_coord(&(particle->position), seq, lattice, num_dimensions);
+
+    particle->position.feasible = 1;
+
+    for (i = 0; i < num_dimensions; ++i)
+    {
+        lattice[particle->position.coord[i].x][particle->position.coord[i].y] = -1;
+    }
+}
+
 void randomize_velocity
 (
-    Velocity *velocity,
+    struct velocity *velocity,
     int num_dimensions
 )
 /* ====================================
@@ -1159,13 +1677,13 @@ void randomize_velocity
 
 void initializes_population
 (
-    Pso_config pso_config,
-    Particle *particles,
-    Position *gbest,
+    struct pso_config pso_config,
+    struct particle *particles,
+    struct position *gbest,
     int num_dimensions,
     int *best_particle_by_edge,
     int **lattice,
-    Polarity *seq
+    enum polarity *seq
 
 )
 /* ===========================================================================================
@@ -1182,7 +1700,7 @@ void initializes_population
         //Randomizes velocity
         randomize_velocity(particles[i].velocity, num_dimensions);
         //Initialize position using current velocity
-        update_position(&(particles[i]), lattice, seq, num_dimensions, pso_config, best_particle_by_edge, i, particles);
+        update_position_1(&(particles[i]), lattice, seq, num_dimensions, pso_config, best_particle_by_edge, i, particles);
         //Update pbest
         copy_position(&(particles[i].pbest), particles[i].position, num_dimensions);
         //Update gbest
@@ -1209,10 +1727,10 @@ int move_amino_acid
 (
     int current_energy,
     int **lattice,
-    Polarity *seq,
+    enum polarity *seq,
     int amino_acid_index,
-    Coord src,
-    Coord dest
+    struct coord src,
+    struct coord dest
 )
 /* ==========================================================================
  * Moves a amino-acid to another position in the lattice, handling the energy
@@ -1237,12 +1755,12 @@ int move_amino_acid
 
 int apply_pm
 (
-    Position position,
-    Pm_config config,
-    Polarity *seq,
+    struct position position,
+    struct pm_config config,
+    enum polarity *seq,
     int **lattice,
     int num_dimensions,
-    Coord *particle_coord
+    struct coord *particle_coord
 )
 /* ========================================================
  * Applies the pull-move configuration to the given protein
@@ -1254,7 +1772,7 @@ int apply_pm
     int last_modified;
     int previous_index;
     int before_previous_index;
-    Coord tempCoord;
+    struct coord coord;
 
     if (config.pm_type == ORIGINAL)
     {
@@ -1302,10 +1820,10 @@ int apply_pm
             position.fitness = move_amino_acid(position.fitness, lattice, seq, i,
                                                position.coord[i], config.curr);
 
-            tempCoord = position.coord[i];
+            coord = position.coord[i];
             position.coord[i] = config.curr;
             config.curr = config.prev;
-            config.prev = tempCoord;
+            config.prev = coord;
 
             last_modified = i;
 
@@ -1353,13 +1871,13 @@ int apply_pm
 
 int generate_pm_config
 (
-    Pm_config *config,
+    struct pm_config *config,
     int **lattice,
-    Pm_type pm_type,
-    Coord curr,
-    Coord prev,
-    Coord next,
-    Coord direction
+    enum pm_type pm_type,
+    struct coord curr,
+    struct coord prev,
+    struct coord next,
+    struct coord direction
 )
 /* =====================================================================================
  * Generates a pull-move configuration for a specific direction of a specific amino-acid
@@ -1397,8 +1915,8 @@ void generate_pm_configs
 (
     int amino_acid_index,
     int **lattice,
-    Coord *particle_coord,
-    Pm_config *configs,
+    struct coord *particle_coord,
+    struct pm_config *configs,
     int *config_index,
     int num_dimensions
 )
@@ -1408,17 +1926,17 @@ void generate_pm_configs
  */
 {
     int result;
-    Pm_config config;
+    struct pm_config config;
     config.amino_acid_index = amino_acid_index;
 
-    Coord right_move = create_new_coord(1, 0);
-    Coord left_move = create_new_coord(-1, 0);
-    Coord up_move = create_new_coord(0, 1);
-    Coord down_move = create_new_coord(0, -1);
+    struct coord right_move = create_new_coord(1, 0);
+    struct coord left_move = create_new_coord(-1, 0);
+    struct coord up_move = create_new_coord(0, 1);
+    struct coord down_move = create_new_coord(0, -1);
 
-    Coord next = particle_coord[amino_acid_index + 1];
-    Coord prev = particle_coord[amino_acid_index - 1];
-    Coord curr = particle_coord[amino_acid_index];
+    struct coord next = particle_coord[amino_acid_index + 1];
+    struct coord prev = particle_coord[amino_acid_index - 1];
+    struct coord curr = particle_coord[amino_acid_index];
 
     result = generate_pm_config(&config, lattice, ORIGINAL, curr, prev, next, right_move);
     if (result) configs[(*config_index)++] = config;
@@ -1445,13 +1963,13 @@ void generate_pm_configs
 
 int pm_search
 (
-    Polarity *seq,
+    enum polarity *seq,
     int num_dimensions,
-    Particle *original_particle,
+    struct particle *original_particle,
     int **lattice,
-    Position best_position,
-    Position position,
-    Pm_config *configs
+    struct position best_position,
+    struct position position,
+    struct pm_config *configs
 )
 /* ============================================================
  * Applies pull-moves on the protein while there is improvement
@@ -1462,7 +1980,7 @@ int pm_search
     int j;
     int num_configs = 0;
     int previous_fitness;
-    Coord lattice_adjust;
+    struct coord lattice_adjust;
     int change = 0;
 
     best_position.fitness = 0;
@@ -1549,10 +2067,10 @@ int pm_search
     return change;
 }
 
-Pso_result pso_run
+struct pso_result pso_run
 (
-    Pso_config pso_config,
-    Polarity *seq,
+    struct pso_config pso_config,
+    enum polarity *seq,
     int num_dimensions,
     int *seed
 )
@@ -1566,14 +2084,14 @@ Pso_result pso_run
     int k;
     int *best_particle_by_edge;
     int **lattice;
-    Position gbest;
-    Position pm_best_position;
-    Position pm_position;
-    Pm_config* pm_configs;
-    Position iteration_position;
+    struct position gbest;
+    struct position pm_best_position;
+    struct position pm_position;
+    struct pm_config* pm_configs;
+    struct position iteration_position;
     int change;
-    Particle *particles;
-    Pso_result pso_result;
+    struct particle *particles;
+    struct pso_result pso_result;
     clock_t t0;
 
     /**/pso_result.energy_evolution = (int*) smalloc(sizeof(int) * pso_config.iterations);
@@ -1595,9 +2113,27 @@ Pso_result pso_run
     {
         for (j = 0; j < pso_config.population; ++j)
         {
-            update_position(&(particles[j]), lattice, seq, num_dimensions, pso_config, best_particle_by_edge, j, particles);
+            switch (pso_config.constructor) {
+
+            case XIAO_LI_HU_2014:
+                update_position_0(&(particles[j]), lattice, seq, num_dimensions, pso_config, best_particle_by_edge, j, particles);
+                break;
+            case HU_ZHANG_LI_2009:
+                update_position_1(&(particles[j]), lattice, seq, num_dimensions, pso_config, best_particle_by_edge, j, particles);
+                break;
+            case SHMYGELSKA_HOOS_2003:
+                update_position_2(&(particles[j]), lattice, seq, num_dimensions, pso_config, best_particle_by_edge, j, particles);
+                break;
+            default:
+                printf("ERROR: aco.c/aco_run(): \"Invalid constructor\"\n");
+                exit(1);
+                break;
+
+            }
             update_velocity(pso_config, &(particles[j]), gbest, num_dimensions);
+
         }
+
 
         for (j = 0; j < num_dimensions - 1; ++j)
         {
@@ -1606,7 +2142,7 @@ Pso_result pso_run
 
         iteration_position = particles[0].position;
 
-        //Daemon search
+        //enum daemon search
         for (j = 0; j < pso_config.population; ++j)
         {
 

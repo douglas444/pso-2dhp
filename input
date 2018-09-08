@@ -11,10 +11,11 @@
 <c2>2.1</c2>
 <w>0.5</w>
 <beta>2</beta>
+<min-probability>0.01</min-probability>
 
 <small-instances-population>200</small-instances-population>
 <big-instances-population>1500</big-instances-population>
 <iterations>500</iterations>
 
 <daemon>PULL_MOVE</daemon>
-<collision-handler>PARTIAL_COPY</collision-handler>
+<collision-handler>SHMYGELSKA_HOOS_2003</collision-handler>
