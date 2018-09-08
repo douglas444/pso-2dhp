@@ -937,243 +937,6 @@ int execute_look_ahead(int **lattice, struct coord position, int num_dimensions,
     return !position_is_invalid;
 }
 
-void update_position_1
-(
-    struct particle *particle,
-    int **lattice,
-    enum polarity *seq,
-    int num_dimensions,
-    struct pso_config pso_config,
-    int *best_particle_by_edge,
-    int particle_index,
-    struct particle *particles
-)
-/* ============================================================================
- * Sets particles position to feasible position built using particle's velocity
- * ============================================================================
- */
-{
-    int i;
-
-    int num_candidates;
-    int selected_candidate;
-    double sum_probabilities;
-    double probabilities[3];
-    struct coord candidate_moves[3];
-    struct candidate candidates[3];
-
-    struct coord foward_position;
-    struct coord last_move;
-
-    int curr_amin;
-    int prev_amin;
-    int next_amin;
-
-    int left_extremity;
-    int right_extremity;
-    int *extremity;
-
-    int side;
-    int last_unfold_side;
-    int unfold_size;
-    particle->pbest.fitness = 0;
-
-    //Defines start edge direction
-
-    left_extremity = ceil(num_dimensions / 2);
-    right_extremity = ceil(num_dimensions / 2) + 1;
-
-    particle->position.coord[left_extremity] = create_new_coord(num_dimensions, num_dimensions);
-    particle->position.coord[right_extremity] = create_new_coord(num_dimensions + 1, num_dimensions);
-
-    lattice[particle->position.coord[left_extremity].x][particle->position.coord[left_extremity].y] = left_extremity;
-    lattice[particle->position.coord[right_extremity].x][particle->position.coord[right_extremity].y] = right_extremity;
-
-    side = 0;//left
-    last_unfold_side = -1;
-
-
-    //Constructor loop
-
-    while (left_extremity > 0 || right_extremity < num_dimensions - 1)
-    {
-        if (side == 0 && left_extremity == 0)
-        {
-            side = 1;
-        }
-        else if (side == 1 && right_extremity == num_dimensions - 1)
-        {
-            side = 0;
-        }
-
-        if (side == 0)
-        {
-            curr_amin = left_extremity;
-            next_amin = left_extremity - 1;
-            prev_amin = left_extremity + 1;
-            extremity = &left_extremity;
-        }
-        else
-        {
-            curr_amin = right_extremity;
-            next_amin = right_extremity + 1;
-            prev_amin = right_extremity - 1;
-            extremity = &right_extremity;
-        }
-
-        last_move = subtract_coord(particle->position.coord[curr_amin], particle->position.coord[prev_amin]);
-
-        sum_probabilities = 0;
-        num_candidates = 0;
-
-        candidate_moves[0] = left(last_move);
-        candidate_moves[1] = right(last_move);
-        candidate_moves[2] = straight(last_move);
-
-        //Defines candidate directions
-
-        //For each direction
-        for (i = 0; i < 3; ++i)
-        {
-
-            foward_position = create_new_coord(particle->position.coord[curr_amin].x + candidate_moves[i].x,
-                                               particle->position.coord[curr_amin].y + candidate_moves[i].y);
-
-            //If the next position in this direction is not occupied, turns current direction into a candidate
-            if (lattice[foward_position.x][foward_position.y] == -1 &&
-                execute_look_ahead(lattice, foward_position, num_dimensions, next_amin))
-            {
-                candidates[num_candidates].move = candidate_moves[i];
-                candidates[num_candidates].coord = foward_position;
-
-                if (seq[next_amin] == H)
-                {
-                    candidates[num_candidates].heuristic =
-                        calculate_heuristic(lattice, next_amin, foward_position, seq);
-                }
-                else
-                {
-                    candidates[num_candidates].heuristic = 0;
-                }
-
-
-
-                probabilities[num_candidates] = pow(exp((double) candidates[num_candidates].heuristic / 0.3), pso_config.beta);
-
-                switch(i) {
-                case LEFT:
-                    probabilities[num_candidates] *= particle->velocity[curr_amin].l;
-                    break;
-                case RIGHT:
-                    probabilities[num_candidates] *= particle->velocity[curr_amin].r;
-                    break;
-                case STRAIGHT:
-                    probabilities[num_candidates] *= particle->velocity[curr_amin].s;
-                    break;
-                default:
-                    break;
-                }
-
-                sum_probabilities += probabilities[num_candidates];
-                ++num_candidates;
-            }
-
-        }
-
-        for (i = 0; i < num_candidates; ++i)
-        {
-            probabilities[i] = probabilities[i] / sum_probabilities;
-        }
-
-        //Selects a candidate
-
-        if (num_candidates == 0)
-        {
-            selected_candidate = -1;
-        }
-        else if (sum_probabilities == 0)
-        {
-            selected_candidate = rand() % num_candidates;
-        }
-        else if (num_candidates > 1)
-        {
-            selected_candidate = random_select(probabilities, num_candidates);
-        }
-        else if (num_candidates == 1)
-        {
-            selected_candidate = 0;
-        }
-
-        //Update conformation
-
-        if (selected_candidate != -1)
-        {
-            *extremity = next_amin;
-
-            particle->position.fitness -= candidates[selected_candidate].heuristic;
-            particle->position.coord[*extremity] = candidates[selected_candidate].coord;
-            lattice[particle->position.coord[*extremity].x][particle->position.coord[*extremity].y] = *extremity;
-            side = !side;
-
-        }
-        else
-        {
-            //When is impossible continue the fold process
-
-            if (right_extremity == ceil(num_dimensions / 2) + 1 ||
-                (last_unfold_side == 1 && left_extremity != ceil(num_dimensions / 2)))
-
-            {
-                unfold_size = 1 + rand() % ((int) ceil(num_dimensions / 2) - left_extremity);
-                extremity = &left_extremity;
-                last_unfold_side = 0;
-
-                curr_amin = *extremity;
-                next_amin = curr_amin - 1;
-                prev_amin = curr_amin + 1;
-            }
-            else
-            {
-
-                unfold_size = 1 + rand() % (right_extremity - ((int) ceil(num_dimensions / 2) + 1));
-                extremity = &right_extremity;
-                last_unfold_side = 1;
-
-                curr_amin = *extremity;
-                next_amin = curr_amin + 1;
-                prev_amin = curr_amin - 1;
-            }
-
-
-            for (i = 0; i < unfold_size; ++i)
-            {
-                if (seq[*extremity] == H)
-                {
-                    particle->position.fitness += calculate_heuristic(lattice, *extremity, particle->position.coord[*extremity], seq);
-                }
-                lattice[particle->position.coord[*extremity].x][particle->position.coord[*extremity].y] = -1;
-
-                next_amin = *extremity;
-                curr_amin = prev_amin;
-                prev_amin = curr_amin - (next_amin - curr_amin);
-
-                *extremity = curr_amin;
-            }
-        }
-    }
-
-
-    adjust_particle_by_coord(&(particle->position), seq, lattice, num_dimensions);
-
-    particle->position.feasible = 1;
-
-
-    for (i = 0; i < num_dimensions; ++i)
-    {
-        lattice[particle->position.coord[i].x][particle->position.coord[i].y] = -1;
-    }
-}
-
 void update_position_0
 (
     struct particle *particle,
@@ -1185,9 +948,9 @@ void update_position_0
     int particle_index,
     struct particle *particles
 )
-/* ============================================================================
- * Sets particles position to feasible position built using particle's velocity
- * ============================================================================
+/* =========================================================
+ * Constructs particle position. Based in Xiao, Li & Hu 2014
+ * =========================================================
  */
 {
     int i;
@@ -1389,6 +1152,244 @@ void update_position_0
     }
 }
 
+
+void update_position_1
+(
+    struct particle *particle,
+    int **lattice,
+    enum polarity *seq,
+    int num_dimensions,
+    struct pso_config pso_config,
+    int *best_particle_by_edge,
+    int particle_index,
+    struct particle *particles
+)
+/* ===========================================================
+ * Constructs particle position. Based in  Hu, Zhang & Li 2009
+ * ===========================================================
+ */
+{
+    int i;
+
+    int num_candidates;
+    int selected_candidate;
+    double sum_probabilities;
+    double probabilities[3];
+    struct coord candidate_moves[3];
+    struct candidate candidates[3];
+
+    struct coord foward_position;
+    struct coord last_move;
+
+    int curr_amin;
+    int prev_amin;
+    int next_amin;
+
+    int left_extremity;
+    int right_extremity;
+    int *extremity;
+
+    int side;
+    int last_unfold_side;
+    int unfold_size;
+    particle->pbest.fitness = 0;
+
+    //Defines start edge direction
+
+    left_extremity = ceil((double) num_dimensions / 2);
+    right_extremity = ceil((double) num_dimensions / 2) + 1;
+
+    particle->position.coord[left_extremity] = create_new_coord(num_dimensions, num_dimensions);
+    particle->position.coord[right_extremity] = create_new_coord(num_dimensions + 1, num_dimensions);
+
+    lattice[particle->position.coord[left_extremity].x][particle->position.coord[left_extremity].y] = left_extremity;
+    lattice[particle->position.coord[right_extremity].x][particle->position.coord[right_extremity].y] = right_extremity;
+
+    side = 0;//left
+    last_unfold_side = -1;
+
+
+    //Constructor loop
+
+    while (left_extremity > 0 || right_extremity < num_dimensions - 1)
+    {
+        if (side == 0 && left_extremity == 0)
+        {
+            side = 1;
+        }
+        else if (side == 1 && right_extremity == num_dimensions - 1)
+        {
+            side = 0;
+        }
+
+        if (side == 0)
+        {
+            curr_amin = left_extremity;
+            next_amin = left_extremity - 1;
+            prev_amin = left_extremity + 1;
+            extremity = &left_extremity;
+        }
+        else
+        {
+            curr_amin = right_extremity;
+            next_amin = right_extremity + 1;
+            prev_amin = right_extremity - 1;
+            extremity = &right_extremity;
+        }
+
+        last_move = subtract_coord(particle->position.coord[curr_amin], particle->position.coord[prev_amin]);
+
+        sum_probabilities = 0;
+        num_candidates = 0;
+
+        candidate_moves[0] = left(last_move);
+        candidate_moves[1] = right(last_move);
+        candidate_moves[2] = straight(last_move);
+
+        //Defines candidate directions
+
+        //For each direction
+        for (i = 0; i < 3; ++i)
+        {
+
+            foward_position = create_new_coord(particle->position.coord[curr_amin].x + candidate_moves[i].x,
+                                               particle->position.coord[curr_amin].y + candidate_moves[i].y);
+
+            //If the next position in this direction is not occupied, turns current direction into a candidate
+            if (lattice[foward_position.x][foward_position.y] == -1 &&
+                execute_look_ahead(lattice, foward_position, num_dimensions, next_amin))
+            {
+                candidates[num_candidates].move = candidate_moves[i];
+                candidates[num_candidates].coord = foward_position;
+
+                if (seq[next_amin] == H)
+                {
+                    candidates[num_candidates].heuristic =
+                        calculate_heuristic(lattice, next_amin, foward_position, seq);
+                }
+                else
+                {
+                    candidates[num_candidates].heuristic = 0;
+                }
+
+
+
+                probabilities[num_candidates] = pow(exp((double) candidates[num_candidates].heuristic / 0.3), pso_config.beta);
+
+                switch(i) {
+                case LEFT:
+                    probabilities[num_candidates] *= particle->velocity[curr_amin].l;
+                    break;
+                case RIGHT:
+                    probabilities[num_candidates] *= particle->velocity[curr_amin].r;
+                    break;
+                case STRAIGHT:
+                    probabilities[num_candidates] *= particle->velocity[curr_amin].s;
+                    break;
+                default:
+                    break;
+                }
+
+                sum_probabilities += probabilities[num_candidates];
+                ++num_candidates;
+            }
+
+        }
+
+        for (i = 0; i < num_candidates; ++i)
+        {
+            probabilities[i] = probabilities[i] / sum_probabilities;
+        }
+
+        //Selects a candidate
+
+        if (num_candidates == 0)
+        {
+            selected_candidate = -1;
+        }
+        else if (sum_probabilities == 0)
+        {
+            selected_candidate = rand() % num_candidates;
+        }
+        else if (num_candidates > 1)
+        {
+            selected_candidate = random_select(probabilities, num_candidates);
+        }
+        else if (num_candidates == 1)
+        {
+            selected_candidate = 0;
+        }
+
+        //Update conformation
+
+        if (selected_candidate != -1)
+        {
+            *extremity = next_amin;
+
+            particle->position.fitness -= candidates[selected_candidate].heuristic;
+            particle->position.coord[*extremity] = candidates[selected_candidate].coord;
+            lattice[particle->position.coord[*extremity].x][particle->position.coord[*extremity].y] = *extremity;
+            side = !side;
+
+        }
+        else
+        {
+            //When is impossible continue the fold process
+
+            if (right_extremity == ceil((double) num_dimensions / 2) + 1 ||
+                (last_unfold_side == 1 && left_extremity != ceil((double) num_dimensions / 2)))
+
+            {
+                unfold_size = 1 + rand() % ((int) ceil((double) num_dimensions / 2) - left_extremity);
+                extremity = &left_extremity;
+                last_unfold_side = 0;
+
+                curr_amin = *extremity;
+                next_amin = curr_amin - 1;
+                prev_amin = curr_amin + 1;
+            }
+            else
+            {
+
+                unfold_size = 1 + rand() % (right_extremity - ((int) ceil((double) num_dimensions / 2) + 1));
+                extremity = &right_extremity;
+                last_unfold_side = 1;
+
+                curr_amin = *extremity;
+                next_amin = curr_amin + 1;
+                prev_amin = curr_amin - 1;
+            }
+
+
+            for (i = 0; i < unfold_size; ++i)
+            {
+                if (seq[*extremity] == H)
+                {
+                    particle->position.fitness += calculate_heuristic(lattice, *extremity, particle->position.coord[*extremity], seq);
+                }
+                lattice[particle->position.coord[*extremity].x][particle->position.coord[*extremity].y] = -1;
+
+                next_amin = *extremity;
+                curr_amin = prev_amin;
+                prev_amin = curr_amin - (next_amin - curr_amin);
+
+                *extremity = curr_amin;
+            }
+        }
+    }
+
+
+    adjust_particle_by_coord(&(particle->position), seq, lattice, num_dimensions);
+
+    particle->position.feasible = 1;
+
+
+    for (i = 0; i < num_dimensions; ++i)
+    {
+        lattice[particle->position.coord[i].x][particle->position.coord[i].y] = -1;
+    }
+}
+
 void update_position_2
 (
     struct particle *particle,
@@ -1400,9 +1401,9 @@ void update_position_2
     int particle_index,
     struct particle *particles
 )
-/* ====================================================
- * Builds ant conformation. Based in Xiao, Li & Hu 2014
- * ====================================================
+/* =============================================================
+ * Constructs particle position. Based in Shmygelska & Hoos 2003
+ * =============================================================
  */
 {
     int i;
@@ -1605,7 +1606,7 @@ void update_position_2
         }
         else
         {
-            unfold_size = ceil((right_extremity - left_extremity) / 2);
+            unfold_size = ceil((double) (right_extremity - left_extremity) / 2);
 
             if (side == 0) {
 
