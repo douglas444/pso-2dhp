@@ -2135,10 +2135,12 @@ struct pso_result pso_run
 
         }
 
-
-        for (j = 0; j < num_dimensions - 1; ++j)
+        if (pso_config.constructor == XIAO_LI_HU_2014)
         {
-            best_particle_by_edge[j] = -1;
+            for (j = 0; j < num_dimensions - 1; ++j)
+            {
+                best_particle_by_edge[j] = -1;
+            }
         }
 
         iteration_position = particles[0].position;
