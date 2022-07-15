@@ -1,29 +1,53 @@
 # Particle Swarm Optimization 2DHP
 
-### Executable pso-2dhp
-###### How to compile
+Implementation of the Particle Swarm Optiomization algorithm for the Protein Structure Prediction problem using 2D HP model. This approach includes the pull move heuristic for local search.
+
+## Requirements
+* gcc
+* g++
+
+## Compilation
+
+To compile, execute each one of the following commands from the root of the project:
 ```
-$ gcc -Wall -O2  -c ./file.c -o ./obj/Release/file.o
-$ gcc -Wall -O2  -c ./main.c -o ./obj/Release/main.o
-$ gcc -Wall -O2  -c ./pso.c -o ./obj/Release/pso.o
-$ g++  -o ./bin/Release/pso-2dhp ./obj/Release/file.o ./obj/Release/main.o ./obj/Release/pso.o  -s
+gcc -Wall -O2  -c ./file.c -o ./file.o
 ```
-###### How to run
 ```
-$ [sudo] ./bin/Release/pso-2dhp input_file_path sequence_key_on_input_file
+gcc -Wall -O2  -c ./main.c -o ./main.o
 ```
-###### Output
+```
+gcc -Wall -O2  -c ./pso.c -o ./pso.o
+```
+```
+g++  -o ./pso-2dhp ./file.o ./main.o ./pso.o  -s
+```
+
+## How to run
+
+After compiling it, you can run the pso-2dhp binary by executing the following command from the root of the project.
+```
+./pso-2dhp input sequence8
+```
+
+You can open the `input` file, located at the root of the project, in a text editor to change the parameters and see other sequences available.
+
+
+The output will be printed following the template bellow
 ```
 iterations|protein|directions|energy|final population average|final population standard deviation|convergence|found on iteration|time|iteration,energy/.../iteration,energy/
 ```
 
-### Bash script.sh
-###### How to run
+## Running the script.sh
+The `script.sh` script can be used to run the pso-2dhp binary for all the 8 sequences avaiable in the `input` file. The script will generate latex tables for all the results obtained. The script will also plot figures representing the best resultant conformation of each protein, as long the `2dhp-plot` binary is avaiable in the root of the project (The `2dhp-plot` binary avaiable in the root of the project was compiled in a linux x64. To compile a new `2dhp-plot` binary, check out this other repository: https://github.com/douglas444/2dhp-plot )
+
+To run the `script.sh` script, execute the following commands from the root of the project
 ```
-$ [sudo] chmod +x ./script.sh
-$ [sudo] ./script.sh
+chmod +x ./script.sh
 ```
-###### Output
+```
+./script.sh
+```
+The results are going to be generated as follows:
 ```
 ./results/outputlog
 ./results/summary
@@ -31,7 +55,7 @@ $ [sudo] ./script.sh
 ./results/tables/sequence[1..8]
 ./results/energy_evolution/sequence[1..8]/run[1..20]
 ```
-###### Generate pdf/png from latex files:
+To generate pdf/png from the latex files, execute the following command, changing `filename` to the path to the latex file that you want to convert to pdf/png
 ```
-$ pdflatex --shell-escape filename
+pdflatex --shell-escape filename
 ```
