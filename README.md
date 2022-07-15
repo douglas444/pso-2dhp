@@ -4,7 +4,6 @@ Implementation of the Particle Swarm Optiomization algorithm for the Protein Str
 
 ## Requirements
 * gcc
-* g++
 
 ## Compilation
 
@@ -19,7 +18,7 @@ gcc -Wall -O2  -c ./main.c -o ./main.o
 gcc -Wall -O2  -c ./pso.c -o ./pso.o
 ```
 ```
-g++  -o ./pso-2dhp ./file.o ./main.o ./pso.o  -s
+gcc  -o ./pso-2dhp ./file.o ./main.o ./pso.o  -lm -s
 ```
 
 ## How to run
