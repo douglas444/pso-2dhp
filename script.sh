@@ -61,7 +61,7 @@ do
 		echo "Run $j"
 
 		#Execute program
-		output=$(sudo ./bin/Release/pso-2dhp ./input sequence"$i")
+		output=$(sudo ./pso-2dhp ./input sequence"$i")
 		if echo "$output" | grep -q "Error"
 		then
 			echo "$output"
